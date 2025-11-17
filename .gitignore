@@ -1,0 +1,63 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+T1D_PINN_venv/
+venv/
+env/
+ENV/
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Data (too large for GitHub)
+data/raw/*.csv
+data/real/*.csv
+data/processed/*.csv
+data/synthetic/*.csv
+
+# Keep directory structure but not data files
+!data/.gitkeep
+!data/raw/.gitkeep
+!data/real/.gitkeep
+!data/processed/.gitkeep
+!data/synthetic/.gitkeep
+
+# Model outputs
+runs/
+checkpoints/
+*.h5
+*.ckpt
+*.pth
+
+# Logs
+*.log
+logs/
+*.out
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary files
+tmp/
+temp/
+*.tmp

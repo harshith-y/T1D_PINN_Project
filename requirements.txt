@@ -1,0 +1,15 @@
+# --- Core runtime deps (compatible with Python 3.13) ---
+numpy>=2.0,<3
+pandas>=2.3,<2.4
+matplotlib>=3.9,<3.11
+scipy>=1.16,<1.17
+tensorflow==2.20.0
+DeepXDE==1.14.0
+
+# --- Optional but useful ---
+scikit-learn>=1.4,<1.8
+optuna>=3.6,<5
+jupyterlab>=4.2,<5
+ipykernel>=6.29,<8
+seaborn>=0.13,<0.14
+tqdm>=4.66,<5
