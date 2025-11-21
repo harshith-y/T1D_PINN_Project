@@ -164,9 +164,16 @@ def simulate_latents_euler(
     T = tf.shape(U)[1]
 
     # Initial conditions: I0 defaults to physiological steady-state Ieq
-    I0_val = p.kl - p.kb
-    I0_val = I0_val / p.ksi if I0 is None else float(I0)
-    I0_tf = tf.fill([B, 1], tf.cast(I0_val, tf.float32))
+    if I0 is None:
+        # Compute steady-state: I_eq = (kl - kb) / ksi
+        # Handle both scalar and tensor ksi
+        ksi_tf = tf.convert_to_tensor(p.ksi, dtype=tf.float32)
+        I0_val = (p.kl - p.kb) / ksi_tf
+    else:
+        I0_val = tf.convert_to_tensor(I0, dtype=tf.float32)
+    
+    # Expand to [B, 1] shape
+    I0_tf = tf.ones([B, 1], dtype=tf.float32) * I0_val
     vI0_tf = tf.fill([B, 1], tf.cast(dI0, tf.float32))
     D0_tf = tf.fill([B, 1], tf.cast(D0, tf.float32))
     vD0_tf = tf.fill([B, 1], tf.cast(dD0, tf.float32))

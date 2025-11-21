@@ -1,0 +1,69 @@
+# Configuration for BI-RNN Inverse Training
+# BI-RNN uses GRU layers with biological residual loss
+
+model_name: birnn
+mode: inverse
+
+# Which parameter to estimate
+inverse_param: ksi
+inverse_init_range: [150, 300]
+
+# Model architecture
+architecture:
+  rnn_units: 96
+  rnn_type: GRU
+  use_fourier: false  # Not applicable to RNN
+
+# Multi-stage training configuration
+# Note: BI-RNN uses different loss structure: [glucose, biological_residual, ic]
+training:
+  stages:
+    - name: stage1_params_only
+      epochs: 200
+      learning_rate: 1.0e-2
+      # Loss weights: [lambda_g, lambda_B, lambda_ic]
+      loss_weights: [1.0, 0.0, 0.0]  # Only glucose loss
+      train_inverse_params: true
+      train_nn_weights: false
+      optimizer: adam
+      display_every: 50
+    
+    - name: stage2_nn_only
+      epochs: 300
+      learning_rate: 5.0e-3
+      # Balanced losses (from Bayesian optimization)
+      loss_weights: [8.0, 4.82, 0.53]
+      train_inverse_params: false
+      train_nn_weights: true
+      optimizer: adam
+      display_every: 50
+    
+    - name: stage3_joint
+      epochs: 100
+      learning_rate: 2.0e-3
+      loss_weights: [8.0, 4.82, 0.53]
+      train_inverse_params: true
+      train_nn_weights: true
+      optimizer: adam
+      display_every: 50
+  
+  use_lbfgs_refinement: false  # Not applicable to BI-RNN
+
+# Data configuration
+data:
+  data_dir: data
+  source: synthetic
+  patient: Pat3
+  train_split: 0.9
+  mask_interval: 10
+  normalize: true
+
+# Output settings
+output:
+  save_dir: results/birnn_inverse_pat3
+  checkpoint_freq: 100
+  log_freq: 50
+  save_best_only: false
+
+device: cpu
+seed: 42

@@ -1,0 +1,93 @@
+# Configuration for Feedforward PINN Inverse Training
+# This config implements the 3-stage training strategy from your notebooks
+
+model_name: pinn
+mode: inverse
+
+# Which parameter to estimate
+inverse_param: ksi
+inverse_init_range: [150, 300]  # Initial search range for ksi
+
+# Model architecture
+architecture:
+  n_layers: 3
+  n_neurons: 30
+  activation: tanh
+  use_fourier: true
+  fourier_features: [0, 1, 2, 3, 4, 5]
+
+# Multi-stage training configuration
+training:
+  # ========================================================================
+  # STAGE 1: Train inverse parameters ONLY (freeze NN weights)
+  # ========================================================================
+  # Goal: Get rough estimate of ksi using only glucose observations
+  # Loss weights: [glucose_obs, ode_g, ode_i, ode_d]
+  #               [1.0, 0.0, 0.0, 0.0] = only penalize glucose observations
+  # ========================================================================
+  
+  # ========================================================================
+  # STAGE 2: Train NN weights ONLY (freeze inverse parameters)
+  # ========================================================================
+  # Goal: Learn accurate state representations with fixed ksi from Stage 1
+  # Loss weights: [7.5, 0.9, 0.18, 4.6] = balanced physics + observations
+  # ========================================================================
+  
+  # ========================================================================
+  # STAGE 3: Joint fine-tuning (train both together)
+  # ========================================================================
+  # Goal: Refine both ksi and NN weights for optimal fit
+  # Loss weights: Same as Stage 2
+  # ========================================================================
+  
+  stages:
+    - name: stage1_params_only
+      epochs: 5000
+      learning_rate: 1.0e-3
+      loss_weights: [1.0, 0.0, 0.0, 0.0]
+      train_inverse_params: true
+      train_nn_weights: false
+      optimizer: adam
+      display_every: 500
+    
+    - name: stage2_nn_only
+      epochs: 8000
+      learning_rate: 5.0e-4
+      loss_weights: [7.5, 0.9, 0.18, 4.6]
+      train_inverse_params: false
+      train_nn_weights: true
+      optimizer: adam
+      display_every: 500
+    
+    - name: stage3_joint
+      epochs: 2000
+      learning_rate: 2.0e-4
+      loss_weights: [7.5, 0.9, 0.18, 4.6]
+      train_inverse_params: true
+      train_nn_weights: true
+      optimizer: adam
+      display_every: 500
+  
+  # L-BFGS-B refinement (optional, after all stages)
+  use_lbfgs_refinement: false
+
+# Data configuration
+data:
+  data_dir: data
+  source: synthetic
+  patient: Pat3
+  train_split: 0.9
+  mask_interval: 10
+  normalize: true
+
+# Output settings
+output:
+  save_dir: results/pinn_inverse_pat3
+  checkpoint_freq: 1000
+  log_freq: 500
+  save_best_only: false
+  wandb_project: null  # Set to enable Weights & Biases logging
+
+# Compute settings
+device: cpu
+seed: 42

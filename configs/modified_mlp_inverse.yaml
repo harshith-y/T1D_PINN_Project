@@ -1,0 +1,69 @@
+# Configuration for Modified-MLP PINN Inverse Training
+# Modified-MLP uses custom gated architecture with U-V encoding
+
+model_name: modified_mlp
+mode: inverse
+
+# Which parameter to estimate
+inverse_param: ksi
+inverse_init_range: [150, 300]
+
+# Model architecture
+architecture:
+  n_layers: 5
+  n_neurons: 30
+  activation: tanh
+  use_fourier: false  # Modified-MLP performs better without Fourier
+  n_encoders: 2  # U and V pathways
+
+# Multi-stage training configuration
+training:
+  stages:
+    - name: stage1_params_only
+      epochs: 5000
+      learning_rate: 1.0e-3
+      loss_weights: [1.0, 0.0, 0.0, 0.0]
+      train_inverse_params: true
+      train_nn_weights: false
+      optimizer: adam
+      display_every: 500
+    
+    - name: stage2_nn_only
+      epochs: 8000
+      learning_rate: 5.0e-4
+      # Modified-MLP uses different loss weights (from Bayesian optimization)
+      loss_weights: [0.89, 5.84, 8.53, 9.91]
+      train_inverse_params: false
+      train_nn_weights: true
+      optimizer: adam
+      display_every: 500
+    
+    - name: stage3_joint
+      epochs: 2000
+      learning_rate: 2.0e-4
+      loss_weights: [0.89, 5.84, 8.53, 9.91]
+      train_inverse_params: true
+      train_nn_weights: true
+      optimizer: adam
+      display_every: 500
+  
+  use_lbfgs_refinement: false
+
+# Data configuration
+data:
+  data_dir: data
+  source: synthetic
+  patient: Pat3
+  train_split: 0.9
+  mask_interval: 10
+  normalize: true
+
+# Output settings
+output:
+  save_dir: results/modified_mlp_inverse_pat3
+  checkpoint_freq: 1000
+  log_freq: 500
+  save_best_only: false
+
+device: cpu
+seed: 42
