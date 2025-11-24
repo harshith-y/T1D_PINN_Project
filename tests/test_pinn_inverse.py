@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-PINN Inverse Training - Fixed Version
+PINN Inverse Training - Log File Version
 
-This version properly handles TensorFlow 1.x session management.
-Key fix: Use DeepXDE's model session, not create a new one.
+This version reads ksi values from the parameter log file instead of
+trying to access TF sessions directly. This is more reliable with DeepXDE.
 """
 
 import os
@@ -25,7 +25,7 @@ from src.models.pinn_feedforward import FeedforwardPINN
 from src.training.config import load_config
 
 print("="*80)
-print("PINN INVERSE TRAINING - CORRECTED SESSION HANDLING")
+print("PINN INVERSE TRAINING - LOG FILE METHOD")
 print("="*80)
 
 # Load config
@@ -35,6 +35,7 @@ config.mode = 'inverse'
 config.inverse_param = 'ksi'
 config.training.epochs = 500  # Short test
 config.training.use_lbfgs_refinement = False  # Skip for speed
+config.output.save_dir = 'results/pinn_inverse_test'  # Custom output dir
 print("✅ Config loaded")
 
 # Load data
@@ -48,20 +49,17 @@ model = FeedforwardPINN(config)
 model.build(data)
 print("✅ Model built")
 
-# Compile - this initializes the session
+# Check inverse params exist
+if model.inverse_params and model.inverse_params.log_ksi is not None:
+    print(f"   Inverse parameter initialized: log_ksi")
+else:
+    print("❌ ERROR: Inverse parameters not initialized!")
+    sys.exit(1)
+
+# Compile
 print("\n[4/5] Compiling model...")
 model.compile()
 print("✅ Model compiled")
-
-# Get initial ksi AFTER compilation (session is initialized)
-# Use the model's dde_model session
-try:
-    sess = model.dde_model.sess
-    initial_ksi = float(sess.run(tf.exp(model.inverse_params.log_ksi)))
-    print(f"   Initial ksi: {initial_ksi:.2f}")
-except Exception as e:
-    print(f"⚠️  Could not read initial ksi: {e}")
-    initial_ksi = None
 
 # Train
 print("\n[5/5] Training (500 epochs)...")
@@ -74,10 +72,31 @@ except Exception as e:
     traceback.print_exc()
     sys.exit(1)
 
-# Get final ksi using model's session
+# Read ksi values from log file
+print("\n[6/6] Reading parameter log...")
+log_file = Path(config.output.save_dir) / "inverse_params.dat"
+
+if not log_file.exists():
+    print(f"❌ Log file not found: {log_file}")
+    print("   Inverse parameter may not have been logged!")
+    sys.exit(1)
+
 try:
-    sess = model.dde_model.sess
-    final_ksi = float(sess.run(tf.exp(model.inverse_params.log_ksi)))
+    with open(log_file, 'r') as f:
+        lines = [line.strip() for line in f.readlines() if line.strip()]
+    
+    if len(lines) == 0:
+        print("❌ Log file is empty!")
+        sys.exit(1)
+    
+    # Parse first line: "0 [5.6123]"
+    initial_log_ksi = float(lines[0].split()[1].strip('[]'))
+    initial_ksi = np.exp(initial_log_ksi)
+    
+    # Parse last line
+    final_log_ksi = float(lines[-1].split()[1].strip('[]'))
+    final_ksi = np.exp(final_log_ksi)
+    
     true_ksi = 274.0
     error = abs(final_ksi - true_ksi) / true_ksi * 100
     
@@ -85,19 +104,21 @@ try:
     print("\n" + "="*80)
     print("RESULTS")
     print("="*80)
-    if initial_ksi is not None:
-        print(f"Initial ksi: {initial_ksi:.2f}")
+    print(f"Initial ksi: {initial_ksi:.2f}")
     print(f"Final ksi:   {final_ksi:.2f}")
     print(f"True ksi:    {true_ksi:.2f}")
     print(f"Error:       {error:.2f}%")
+    print(f"Logged {len(lines)} parameter values during training")
     print("="*80)
     
 except Exception as e:
-    print(f"❌ Could not read final ksi: {e}")
-    error = 100.0  # Assume failure
+    print(f"❌ Error reading log file: {e}")
+    import traceback
+    traceback.print_exc()
+    error = 100.0
 
 # Evaluate
-print("\n[6/6] Evaluating...")
+print("\n[7/7] Evaluating...")
 try:
     metrics = model.evaluate()
     print("✅ Evaluation completed")

@@ -168,6 +168,150 @@ def load_synthetic_window(
     )
 
 
+def load_real_patient_csv(
+    patient: int,
+    root: str | Path = "data/processed",
+    t_start: Optional[int] = None,
+    t_end: Optional[int] = None
+) -> TrainingWindow:
+    """
+    Load real patient data from RealPat{patient}.csv.
+    
+    This function loads preprocessed real patient data from CSV files in the
+    processed directory. Unlike synthetic data, real data typically only has
+    glucose measurements and inputs, without ground truth for latent states.
+    
+    The CSV format matches synthetic patients with columns for insulin,
+    insulin_derivative, and carbohydrates, but these are empty (blank strings)
+    for real patients since we don't have ground truth.
+    
+    Args:
+        patient: Patient number (1-15)
+        root: Directory containing RealPat{N}.csv files
+        t_start: Optional start time in minutes (for windowing)
+        t_end: Optional end time in minutes (for windowing)
+    
+    Returns:
+        TrainingWindow with glucose/u/r populated, latent states = None
+        
+    Raises:
+        FileNotFoundError: If RealPat{patient}.csv doesn't exist
+        ValueError: If CSV is missing required columns or time range invalid
+    
+    Example:
+        >>> window = load_real_patient_csv(patient=3)
+        >>> print(window.glucose.shape)  # (25000,) or similar
+        >>> print(window.has_latent_states)  # False (no ground truth I, D)
+        >>> # Use in training:
+        >>> model.fit(window.time_norm, window.glucose, ...)
+    
+    Notes:
+        - Real data may have NaN values (sensor dropouts)
+        - Columns for insulin/carbohydrates exist but are empty
+        - u and r inputs are present (derived from clinical records)
+        - Sampling rate may be irregular (CGM artifacts)
+    """
+    root = Path(root)
+    csv_path = root / f"RealPat{patient}.csv"
+    
+    if not csv_path.exists():
+        raise FileNotFoundError(
+            f"Real patient data not found: {csv_path}\n"
+            f"Available files in {root}:\n" +
+            "\n".join(f"  - {f.name}" for f in sorted(root.glob("RealPat*.csv")))
+        )
+    
+    # Load CSV
+    df = pd.read_csv(csv_path)
+    
+    # Expected columns (matching synthetic format):
+    # ['time', 'patient', 'glucose', 'glucose_derivative', 'insulin', 
+    #  'insulin_derivative', 'carbohydrates', 'u', 'r']
+    # Note: insulin, insulin_derivative, carbohydrates are EMPTY for real patients
+    
+    # Required columns (at minimum)
+    required_cols = ['time', 'glucose']
+    missing = set(required_cols) - set(df.columns)
+    if missing:
+        raise ValueError(
+            f"CSV missing required columns: {missing}\n"
+            f"Available columns: {list(df.columns)}\n"
+            f"Real patient CSVs must have at least 'time' and 'glucose'"
+        )
+    
+    # Optional: window the data by time
+    if t_start is not None or t_end is not None:
+        t_start = t_start or df['time'].min()
+        t_end = t_end or df['time'].max()
+        mask = (df['time'] >= t_start) & (df['time'] <= t_end)
+        df = df[mask].copy()
+        
+        if df.empty:
+            raise ValueError(f"No data in time range [{t_start}, {t_end}]")
+    
+    # Extract required arrays
+    t = df['time'].values.astype(np.float32)
+    G = df['glucose'].values.astype(np.float32)
+    
+    # Helper function to extract column, handling empty strings (common in real data)
+    def extract_column(df, col_name):
+        """Extract column as float array, returning None if column is empty/all NaN."""
+        if col_name not in df.columns:
+            return None
+        
+        # Try to convert to float, empty strings become NaN
+        arr = pd.to_numeric(df[col_name], errors='coerce').values.astype(np.float32)
+        
+        # If all values are NaN, treat as empty column
+        if np.all(np.isnan(arr)):
+            return None
+        
+        return arr
+    
+    # Extract optional arrays with proper empty-string handling
+    u = extract_column(df, 'u')
+    r = extract_column(df, 'r')
+    
+    # If u or r is None/empty, use zeros (no inputs)
+    u = u if u is not None else np.zeros_like(t)
+    r = r if r is not None else np.zeros_like(t)
+    
+    # Real data typically doesn't have ground truth for latent states
+    # Columns may exist but be empty (empty strings in CSV)
+    I = extract_column(df, 'insulin')  # Will be None if empty
+    D = extract_column(df, 'carbohydrates')  # Will be None if empty
+    dG = extract_column(df, 'glucose_derivative')  # May or may not be present
+    
+    # Scaling factors
+    m_t = float(t.max()) if t.max() > 0 else 1.0
+    m_g = float(np.nanmax(G)) if np.nanmax(G) > 0 else 1.0  # Use nanmax for real data
+    m_i = 1.0  # Standard scaling
+    m_d = float(np.nanmax(D)) if D is not None and np.nanmax(D) > 0 else 1.0
+    
+    # Normalize time to [0, 1]
+    t_min = t - t[0]  # Start from 0
+    time_norm = t_min / m_t if m_t > 0 else t_min
+    
+    return TrainingWindow(
+        t_min=t_min,
+        time_norm=time_norm,
+        glucose=G,
+        u=u,
+        r=r,
+        # Real data has no ground truth for these (columns exist but are empty)
+        glucose_deriv=dG,  # May be present from preprocessing
+        insulin=I,         # None (empty column)
+        insulin_deriv=None,
+        digestion=D,       # None (empty column)
+        patient_id=f"RealPat{patient}",
+        data_source="real",
+        m_t=m_t,
+        m_g=m_g,
+        m_i=m_i,
+        m_d=m_d
+    )
+
+
 def load_real_window(window_json: str | Path) -> TrainingWindow:
     """
     Load real patient window from JSON (created by prepare_data.py).

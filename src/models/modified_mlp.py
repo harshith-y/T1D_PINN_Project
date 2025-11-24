@@ -436,6 +436,7 @@ class ModifiedMLPPINN:
         
         # Inverse parameter logging
         if self.inverse_params and self.inverse_params.log_ksi is not None:
+            Path(self.config.output.save_dir).mkdir(parents=True, exist_ok=True)
             param_logger = dde.callbacks.VariableValue(
                 [self.inverse_params.log_ksi],
                 period=display_every,
