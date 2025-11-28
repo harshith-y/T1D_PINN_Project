@@ -1,0 +1,6 @@
+{
+  "model_name": "birnn",
+  "patient": 5,
+  "data_type": "synthetic",
+  "epochs": 100,
+  "rmse_interpolation": 
