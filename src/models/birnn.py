@@ -28,6 +28,8 @@ from src.datasets.loader import TrainingWindow
 from src.physics.magdelaine import (
     MagdelaineParams,
     make_params_from_preset,
+    make_inverse_params,    
+    get_param_value,          
     simulate_latents_euler,
     residuals_euler_seq,
 )
@@ -188,15 +190,35 @@ class BIRNN:
         # Setup inverse parameters if needed
         mode = getattr(self.config, 'mode', 'forward')
         if mode == 'inverse':
-            # Create trainable log_ksi
-            self.log_ksi = tf.Variable(
-                tf.math.log(self.params.ksi),
-                dtype=tf.float32,
-                name="log_ksi"
+            # Get list of parameters to estimate from config (default: ['ksi'])
+            inverse_params_list = getattr(self.config, 'inverse_params', ['ksi'])
+            if isinstance(inverse_params_list, str):
+                inverse_params_list = [inverse_params_list]
+            
+            # Create inverse parameters with random initialization
+            self.inverse_params_obj = make_inverse_params(
+                param_list=inverse_params_list,
+                true_params=self.params,
+                random_init=True  # Random within μ±2σ range
             )
-            self.inverse_params = [self.log_ksi]
+            
+            # Store list of trainable variables
+            self.inverse_params = self.inverse_params_obj.get_all_variables()
+            
+            # Print initialization info
+            print(f"\n🔬 Inverse Training - Initializing Parameters:")
+            print(f"   Estimating: {inverse_params_list}")
+            for param_name in inverse_params_list:
+                true_value = getattr(self.params, param_name)
+                estimated_value = self.inverse_params_obj.get_param_value(param_name)
+                error = abs(estimated_value - true_value) / true_value * 100
+                print(f"   {param_name}:")
+                print(f"      True:    {true_value:.6f}")
+                print(f"      Initial: {estimated_value:.6f} (random)")
+                print(f"      Error:   {error:.1f}%")
+            print(f"   ✅ Initialized {len(inverse_params_list)} parameter(s)\n")
         else:
-            self.log_ksi = None
+            self.inverse_params_obj = None
             self.inverse_params = []
         
         # Prepare sequences for RNN training
@@ -372,20 +394,23 @@ class BIRNN:
         ut = u_in * self.u_max  # U/min
         rt = r_in * self.r_max  # g/min
         
-        # Get parameters (use inverse if enabled)
-        if self.log_ksi is not None:
-            ksi = tf.exp(self.log_ksi)
-        else:
-            ksi = self.params.ksi
+        # Get parameters (use trainable inverse values if enabled, else use preset)
+        ksi = get_param_value(self.inverse_params_obj, self.params, 'ksi')
+        kl = get_param_value(self.inverse_params_obj, self.params, 'kl')
+        ku_Vi = get_param_value(self.inverse_params_obj, self.params, 'ku_Vi')
+        kb = get_param_value(self.inverse_params_obj, self.params, 'kb')
+        Tu = get_param_value(self.inverse_params_obj, self.params, 'Tu')
+        Tr = get_param_value(self.inverse_params_obj, self.params, 'Tr')
+        kr_Vb = get_param_value(self.inverse_params_obj, self.params, 'kr_Vb')
         
         # Magdelaine ODEs (first-order approximation)
         # All derivatives in PHYSICAL units:
         # dG/dt: mg/dL/min
         # dI/dt: U/dL/min  
         # dD/dt: mg/dL/min²
-        dG = -ksi * I + self.params.kl - self.params.kb + D
-        dI = -I / self.params.Tu + (self.params.ku_Vi / self.params.Tu) * ut
-        dD = -D / self.params.Tr + (self.params.kr_Vb / self.params.Tr) * rt
+        dG = -ksi * I + kl - kb + D
+        dI = -I / Tu + (ku_Vi / Tu) * ut
+        dD = -D / Tr + (kr_Vb / Tr) * rt
         
         # Forward Euler: y(t+1) = y(t) + dt * dy/dt
         # dt = 1.0 minute (physical time, matching data sampling rate)

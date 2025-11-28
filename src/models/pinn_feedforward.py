@@ -45,8 +45,8 @@ sys.path.insert(0, str(project_root))
 from src.physics.magdelaine import (
     MagdelaineParams,
     make_params_from_preset,
-    InverseParams,
     make_inverse_params,
+    get_param_value,
     residuals_dde,
 )
 from src.datasets.loader import TrainingWindow
@@ -113,8 +113,27 @@ class FeedforwardPINN:
         # Inverse mode setup
         self.inverse_params = None
         if config.mode == 'inverse':
-            ksi_init = config.inverse_init_range[0] if config.inverse_init_range else None
-            self.inverse_params = make_inverse_params(enable=True, ksi_init=ksi_init)
+            # Get list of parameters to estimate from config (default: ['ksi'])
+            inverse_params_list = getattr(config, 'inverse_params', ['ksi'])
+            if isinstance(inverse_params_list, str):
+                inverse_params_list = [inverse_params_list]
+            
+            # Create inverse parameters with random initialization
+            self.inverse_params = make_inverse_params(
+                param_list=inverse_params_list,
+                true_params=self.params,
+                random_init=True
+            )
+            
+            # Print initialization info
+            print(f"\n🔬 Inverse Training - Initializing Parameters:")
+            print(f"   Estimating: {inverse_params_list}")
+            for param_name in inverse_params_list:
+                true_value = getattr(self.params, param_name)
+                estimated_value = self.inverse_params.get_param_value(param_name)
+                error = abs(estimated_value - true_value) / true_value * 100
+                print(f"   {param_name}: True={true_value:.6f}, Init={estimated_value:.6f}, Error={error:.1f}%")
+            print(f"   ✅ Initialized {len(inverse_params_list)} parameter(s)\n")
         
         # Model components (initialized in build())
         self.net = None

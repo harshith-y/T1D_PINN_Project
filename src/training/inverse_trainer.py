@@ -59,13 +59,21 @@ class InverseTrainer:
         # Determine model type
         self.model_type = self._infer_model_type()
         
-        # Initialize parameter tracking
+        # Get list of parameters being estimated
+        self.inverse_params_list = getattr(config, 'inverse_params', ['ksi'])
+        if isinstance(self.inverse_params_list, str):
+            self.inverse_params_list = [self.inverse_params_list]
+        
+        # Initialize parameter tracking for each parameter
         self.param_history = {
             'epochs': [],
-            'param_values': [],
-            'losses': [],
             'stages': []
         }
+        
+        # Add tracking for each parameter
+        for param_name in self.inverse_params_list:
+            self.param_history[f'{param_name}_values'] = []
+            self.param_history[f'{param_name}_losses'] = []
         
         # Validate config has stages
         if not self.config.training.stages:
@@ -93,17 +101,18 @@ class InverseTrainer:
         Returns:
             Dictionary with training history and final results:
                 - param_history: Evolution of parameter values
-                - final_param: Final parameter value
-                - param_error_percent: Error vs true value (if provided)
+                - final_params: Dict of final parameter values
+                - param_errors_percent: Dict of errors vs true values (if provided)
                 - stages_completed: Number of stages completed
         """
         print(f"\n{'='*80}")
         print(f"INVERSE TRAINING - {len(self.config.training.stages)} STAGES")
         print(f"{'='*80}")
         print(f"Model: {self.model_type.upper()}")
-        print(f"Parameter: {self.config.inverse_param}")
+        print(f"Parameters: {self.inverse_params_list}")
         if self.true_param_value:
-            print(f"True value: {self.true_param_value:.2f}")
+            # true_param_value is only for first parameter (backward compatibility)
+            print(f"True {self.inverse_params_list[0]}: {self.true_param_value:.2f}")
         print(f"{'='*80}\n")
         
         cumulative_epoch = 0
@@ -126,27 +135,33 @@ class InverseTrainer:
                 stage_name=stage_dict['name']
             )
         
-        # Get final parameter value
-        final_param = self._get_current_param_value()
+        # Get final parameter values for all estimated parameters
+        final_params = {}
+        param_errors = {}
         
-        # Compute error if true value available
-        param_error = None
-        if self.true_param_value:
-            param_error = abs(final_param - self.true_param_value) / self.true_param_value * 100
+        for param_name in self.inverse_params_list:
+            final_value = self._get_current_param_value(param_name)
+            final_params[param_name] = final_value
+            
+            # Compute error if true value available (only for first param - backward compat)
+            if param_name == self.inverse_params_list[0] and self.true_param_value:
+                error = abs(final_value - self.true_param_value) / self.true_param_value * 100
+                param_errors[param_name] = error
         
         print(f"\n{'='*80}")
         print("INVERSE TRAINING COMPLETE")
         print(f"{'='*80}")
-        print(f"Final {self.config.inverse_param}: {final_param:.2f}")
-        if param_error is not None:
-            print(f"True {self.config.inverse_param}: {self.true_param_value:.2f}")
-            print(f"Error: {param_error:.2f}%")
+        for param_name, final_value in final_params.items():
+            print(f"Final {param_name}: {final_value:.2f}")
+            if param_name in param_errors:
+                print(f"  True {param_name}: {self.true_param_value:.2f}")
+                print(f"  Error: {param_errors[param_name]:.2f}%")
         print(f"{'='*80}\n")
         
         return {
             'param_history': self.param_history,
-            'final_param': final_param,
-            'param_error_percent': param_error,
+            'final_params': final_params,
+            'param_errors_percent': param_errors,
             'stages_completed': len(self.config.training.stages)
         }
     
@@ -193,20 +208,28 @@ class InverseTrainer:
             # Training step
             loss_dict = self._train_step(var_list, train_nn, stage_config)
             
-            # Track parameter
+            # Track parameters (every 10 epochs)
             if epoch % 10 == 0:
-                param_value = self._get_current_param_value()
                 self.param_history['epochs'].append(cumulative_epoch + epoch)
-                self.param_history['param_values'].append(param_value)
-                self.param_history['losses'].append(loss_dict['total'])
                 self.param_history['stages'].append(stage_name)
+                
+                # Track each parameter being estimated
+                for param_name in self.inverse_params_list:
+                    param_value = self._get_current_param_value(param_name)
+                    self.param_history[f'{param_name}_values'].append(param_value)
+                    self.param_history[f'{param_name}_losses'].append(loss_dict['total'])
             
             # Display progress
             if epoch % display_every == 0 or epoch == epochs - 1:
-                param_value = self._get_current_param_value()
+                # Show all parameters being estimated
+                param_strs = []
+                for param_name in self.inverse_params_list:
+                    param_value = self._get_current_param_value(param_name)
+                    param_strs.append(f"{param_name}={param_value:.2f}")
+                
                 print(f"  Epoch {epoch}/{epochs}: "
                       f"Loss = {loss_dict['total']:.4f}, "
-                      f"{self.config.inverse_param} = {param_value:.2f}")
+                      f"{', '.join(param_strs)}")
         
         return cumulative_epoch + epochs
     
@@ -229,11 +252,9 @@ class InverseTrainer:
         
         # Add inverse parameters if requested
         if train_params:
-            if hasattr(self.model, 'log_ksi'):
-                var_list.append(self.model.log_ksi)
-            elif hasattr(self.model, 'inverse_params') and self.model.inverse_params:
-                if self.model.inverse_params.log_ksi is not None:
-                    var_list.append(self.model.inverse_params.log_ksi)
+            # Collect all trainable inverse parameters
+            if hasattr(self.model, 'inverse_params') and self.model.inverse_params:
+                var_list.extend(self.model.inverse_params)
             else:
                 raise AttributeError("Model does not have trainable inverse parameters")
         
@@ -323,10 +344,10 @@ class InverseTrainer:
         """
         Compute biological residual for BI-RNN.
         
-        Uses the corrected version from test_birnn_inverse_training.py with:
-        - Proper input denormalization (stored u_max, r_max)
-        - Proper timestep (dt = 1.0 / m_t)
+        Uses flexible parameter system - any combination of parameters can be trainable.
         """
+        from src.physics.magdelaine import get_param_value
+        
         # Denormalize states
         y_pred_flat = tf.reshape(Y_pred, [-1, 3])
         y_in_flat = tf.reshape(self.model.Y_train, [-1, 3])
@@ -337,17 +358,23 @@ class InverseTrainer:
         I = y_in_flat[:, 1:2] * self.data.m_i
         D = y_in_flat[:, 2:3] * self.data.m_d
         
-        # Denormalize inputs (CORRECTED: use stored max values)
+        # Denormalize inputs (use stored max values)
         ut = u_in_flat * self.model.u_max
         rt = r_in_flat * self.model.r_max
         
-        # Get trainable ksi
-        ksi = tf.exp(self.model.log_ksi)
+        # Get parameters (trainable if in inverse_params_obj, else use preset)
+        ksi = get_param_value(self.model.inverse_params_obj, self.model.params, 'ksi')
+        kl = get_param_value(self.model.inverse_params_obj, self.model.params, 'kl')
+        ku_Vi = get_param_value(self.model.inverse_params_obj, self.model.params, 'ku_Vi')
+        kb = get_param_value(self.model.inverse_params_obj, self.model.params, 'kb')
+        Tu = get_param_value(self.model.inverse_params_obj, self.model.params, 'Tu')
+        Tr = get_param_value(self.model.inverse_params_obj, self.model.params, 'Tr')
+        kr_Vb = get_param_value(self.model.inverse_params_obj, self.model.params, 'kr_Vb')
         
         # First-order ODEs
-        dG = (-ksi * I + self.model.params.kl - self.model.params.kb + D)
-        dI = -I / self.model.params.Tu + (self.model.params.ku_Vi / self.model.params.Tu) * ut
-        dD = -D / self.model.params.Tr + (self.model.params.kr_Vb / self.model.params.Tr) * rt
+        dG = (-ksi * I + kl - kb + D)
+        dI = -I / Tu + (ku_Vi / Tu) * ut
+        dD = -D / Tr + (kr_Vb / Tr) * rt
         
         # Forward Euler with CORRECTED timestep
         dt = 1.0 / self.data.m_t  # NOT dt = 1.0!
@@ -383,15 +410,17 @@ class InverseTrainer:
             "_train_step_deepxde based on your specific needs."
         )
     
-    def _get_current_param_value(self) -> float:
+    def _get_current_param_value(self, param_name: str = 'ksi') -> float:
         """Get current value of inverse parameter."""
-        if hasattr(self.model, 'log_ksi'):
-            return float(tf.exp(self.model.log_ksi))
-        elif hasattr(self.model, 'inverse_params') and self.model.inverse_params:
-            if self.model.inverse_params.log_ksi is not None:
-                return float(tf.exp(self.model.inverse_params.log_ksi))
+        from src.physics.magdelaine import get_param_value
         
-        raise AttributeError("Cannot find inverse parameter")
+        if hasattr(self.model, 'inverse_params_obj') and self.model.inverse_params_obj is not None:
+            value = self.model.inverse_params_obj.get_param_value(param_name)
+            if value is not None:
+                return value
+        
+        # Fallback to model params (if not trainable)
+        return float(getattr(self.model.params, param_name))
 
 
 # Example usage

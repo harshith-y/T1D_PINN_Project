@@ -33,6 +33,7 @@ from src.physics.magdelaine import (
     InverseParams,
     make_params_from_preset,
     make_inverse_params,
+    get_param_value,
     residuals_dde,
 )
 
@@ -264,12 +265,29 @@ class ModifiedMLPPINN:
         # Setup inverse parameters if needed
         mode = getattr(self.config, 'mode', 'forward')
         if mode == 'inverse':
+            # Get list of parameters to estimate from config (default: ['ksi'])
+            inverse_params_list = getattr(self.config, 'inverse_params', ['ksi'])
+            if isinstance(inverse_params_list, str):
+                inverse_params_list = [inverse_params_list]
+            
+            # Create inverse parameters with random initialization
             self.inverse_params = make_inverse_params(
-                enable=True,
-                ksi_init=self.params.ksi
+                param_list=inverse_params_list,
+                true_params=self.params,
+                random_init=True
             )
+            
+            # Print initialization info
+            print(f"\n🔬 Inverse Training - Initializing Parameters:")
+            print(f"   Estimating: {inverse_params_list}")
+            for param_name in inverse_params_list:
+                true_value = getattr(self.params, param_name)
+                estimated_value = self.inverse_params.get_param_value(param_name)
+                error = abs(estimated_value - true_value) / true_value * 100
+                print(f"   {param_name}: True={true_value:.6f}, Init={estimated_value:.6f}, Error={error:.1f}%")
+            print(f"   ✅ Initialized {len(inverse_params_list)} parameter(s)\n")
         else:
-            self.inverse_params = make_inverse_params(enable=False)
+            self.inverse_params = make_inverse_params(param_list=None)
         
         # Create input lookup tables
         self.lookup = InputLookup(data_window.u, data_window.r)

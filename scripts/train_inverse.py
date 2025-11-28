@@ -61,9 +61,10 @@ def main():
     parser.add_argument('--data-type', type=str, default='synthetic',
                         choices=['synthetic', 'real'],
                         help='Data type: synthetic (with ground truth) or real (estimates only)')
-    parser.add_argument('--param', type=str, default=None,
-                        choices=['ksi', 'kl', 'ku_Vi'],
-                        help='Parameter to estimate (overrides config)')
+    parser.add_argument('--inverse-params', type=str, nargs='+', default=['ksi'],
+                        help='Parameters to estimate (default: ksi). '
+                             'Options: ksi kl ku_Vi kb Tu Tr kr_Vb M. '
+                             'Examples: --inverse-params ksi  OR  --inverse-params ksi kl ku_Vi')
     parser.add_argument('--save-dir', type=str, default=None)
     
     args = parser.parse_args()
@@ -96,9 +97,9 @@ def main():
         print("   See configs/birnn_inverse.yaml for example")
         sys.exit(1)
     
-    # Override param if specified
-    if args.param:
-        config.inverse_param = args.param
+    # Set inverse parameters from command line (overrides config)
+    # Default is ['ksi'] if not specified
+    config.inverse_params = args.inverse_params
     
     model_display = {
         'birnn': 'BI-RNN',
@@ -108,7 +109,7 @@ def main():
     
     print(f"✅ Config loaded")
     print(f"   Model: {model_display}")
-    print(f"   Parameter: {config.inverse_param}")
+    print(f"   Parameters: {config.inverse_params}")
     print(f"   Stages: {len(config.training.stages)}")
     
     # Set output directory
