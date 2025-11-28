@@ -100,15 +100,25 @@ class CheckpointManager:
         
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
         
-        # Save model weights
-        weights_path = checkpoint_dir / "model_weights.h5"
+        # Save model weights (handle both old and new Keras formats)
         try:
             if hasattr(model, 'model'):
                 # BI-RNN style: model.model is the Keras model
-                model.model.save_weights(str(weights_path))
+                keras_model = model.model
             else:
                 # Direct Keras model
-                model.save_weights(str(weights_path))
+                keras_model = model
+            
+            # Try new format first (.weights.h5), fall back to old format (.h5)
+            weights_path_new = checkpoint_dir / "model.weights.h5"
+            weights_path_old = checkpoint_dir / "model_weights.h5"
+            
+            try:
+                keras_model.save_weights(str(weights_path_new))
+            except:
+                # Fall back to old format
+                keras_model.save_weights(str(weights_path_old))
+                
         except Exception as e:
             print(f"⚠️  Warning: Could not save model weights: {e}")
         
@@ -116,7 +126,15 @@ class CheckpointManager:
         if optimizer is not None:
             optimizer_path = checkpoint_dir / "optimizer_state.npy"
             try:
-                optimizer_weights = optimizer.get_weights()
+                # Try new Keras 3.x API first
+                if hasattr(optimizer, 'variables'):
+                    optimizer_weights = [v.numpy() for v in optimizer.variables]
+                # Fall back to old API
+                elif hasattr(optimizer, 'get_weights'):
+                    optimizer_weights = optimizer.get_weights()
+                else:
+                    raise AttributeError("Optimizer has no weights attribute")
+                
                 np.save(str(optimizer_path), optimizer_weights, allow_pickle=True)
             except Exception as e:
                 print(f"⚠️  Warning: Could not save optimizer state: {e}")
@@ -129,6 +147,22 @@ class CheckpointManager:
             'is_final': is_final,
             'is_interrupted': is_interrupted
         }
+        
+        # Convert NumPy types to Python types for JSON serialization
+        def convert_to_python_type(obj):
+            """Recursively convert NumPy types to Python types."""
+            if isinstance(obj, dict):
+                return {k: convert_to_python_type(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [convert_to_python_type(item) for item in obj]
+            elif isinstance(obj, (np.integer, np.floating)):
+                return float(obj)
+            elif isinstance(obj, np.ndarray):
+                return obj.tolist()
+            else:
+                return obj
+        
+        training_state = convert_to_python_type(training_state)
         
         state_path = checkpoint_dir / "training_state.json"
         with open(state_path, 'w') as f:
@@ -195,8 +229,12 @@ class CheckpointManager:
         if not checkpoint_dir.exists():
             raise FileNotFoundError(f"Checkpoint not found: {checkpoint_dir}")
         
-        # Load model weights
-        weights_path = checkpoint_dir / "model_weights.h5"
+        # Load model weights (try both old and new formats)
+        weights_path_new = checkpoint_dir / "model.weights.h5"
+        weights_path_old = checkpoint_dir / "model_weights.h5"
+        
+        weights_path = weights_path_new if weights_path_new.exists() else weights_path_old
+        
         if weights_path.exists():
             try:
                 if hasattr(model, 'model'):
@@ -212,7 +250,16 @@ class CheckpointManager:
             if optimizer_path.exists():
                 try:
                     optimizer_weights = np.load(str(optimizer_path), allow_pickle=True)
-                    optimizer.set_weights(optimizer_weights)
+                    
+                    # Try new API first, fall back to old
+                    if hasattr(optimizer, 'variables'):
+                        for var, weight in zip(optimizer.variables, optimizer_weights):
+                            var.assign(weight)
+                    elif hasattr(optimizer, 'set_weights'):
+                        optimizer.set_weights(optimizer_weights)
+                    else:
+                        raise AttributeError("Optimizer has no set_weights method")
+                        
                 except Exception as e:
                     print(f"⚠️  Warning: Could not load optimizer state: {e}")
         

@@ -6,14 +6,14 @@ Complete reference for all enhanced training, visualization, and evaluation scri
 
 ## 📋 Table of Contents
 
-1. [train_forward_v2.py](#1-train_forward_v2py) - Forward training with checkpointing
-2. [train_inverse_v2.py](#2-train_inverse_v2py) - Multi-stage inverse parameter estimation
-3. [visualize_v2.py](#3-visualize_v2py) - Fast visualization from saved predictions
-4. [evaluate_v2.py](#4-evaluate_v2py) - Comprehensive evaluation and metrics
+1. [train_forward.py](#1-train_forwardpy) - Forward training with checkpointing
+2. [train_inverse.py](#2-train_inversepy) - Multi-stage inverse parameter estimation
+3. [visualise.py](#3-visualisepy) - Fast visualization from saved predictions
+4. [evaluate.py](#4-evaluatepy) - Comprehensive evaluation and metrics
 
 ---
 
-## 1. train_forward_v2.py
+## 1. train_forward.py
 
 **Purpose:** Train models for glucose prediction (forward problem) with enhanced checkpointing and prediction saving.
 
@@ -33,25 +33,25 @@ Complete reference for all enhanced training, visualization, and evaluation scri
 #### Basic Training (Synthetic Patient):
 ```bash
 # Train BI-RNN on synthetic patient 3 for 2000 epochs
-python scripts/train_forward_v2.py --model birnn --patient 3 --epochs 2000
+python scripts/train_forward.py --model birnn --patient 3 --epochs 2000
 ```
 
 #### Real Patient Data:
 ```bash
 # Train PINN on real patient 5
-python scripts/train_forward_v2.py --model pinn --patient 5 --data-type real --epochs 1000
+python scripts/train_forward.py --model pinn --patient 5 --data-type real --epochs 1000
 ```
 
 #### Quick Test (Short Training):
 ```bash
 # Quick 500-epoch test
-python scripts/train_forward_v2.py --model birnn --patient 3 --epochs 500
+python scripts/train_forward.py --model birnn --patient 3 --epochs 500
 ```
 
 #### Resume Interrupted Training:
 ```bash
 # Resume from interrupted checkpoint
-python scripts/train_forward_v2.py \
+python scripts/train_forward.py \
     --model birnn \
     --patient 3 \
     --resume results/birnn_forward/Pat3_20241127_143022/checkpoints/interrupted
@@ -60,7 +60,7 @@ python scripts/train_forward_v2.py \
 #### Custom Output Directory:
 ```bash
 # Save to custom location
-python scripts/train_forward_v2.py \
+python scripts/train_forward.py \
     --model birnn \
     --patient 3 \
     --epochs 2000 \
@@ -96,7 +96,7 @@ results/birnn_forward/Pat3_20241127_143022/
 
 ---
 
-## 2. train_inverse_v2.py
+## 2. train_inverse.py
 
 **Purpose:** Multi-stage inverse training for parameter estimation (e.g., estimating ksi, kl, ku_Vi).
 
@@ -115,7 +115,7 @@ results/birnn_forward/Pat3_20241127_143022/
 #### Basic Inverse Training (Synthetic):
 ```bash
 # Estimate ksi for synthetic patient 3 (has ground truth for error calculation)
-python scripts/train_inverse_v2.py \
+python scripts/train_inverse.py \
     --config configs/birnn_inverse.yaml \
     --patient 3
 ```
@@ -123,7 +123,7 @@ python scripts/train_inverse_v2.py \
 #### Real Patient (No Ground Truth):
 ```bash
 # Estimate parameters for real patient 5 (no error calculation, but gets estimates)
-python scripts/train_inverse_v2.py \
+python scripts/train_inverse.py \
     --config configs/birnn_inverse.yaml \
     --patient 5 \
     --data-type real
@@ -132,7 +132,7 @@ python scripts/train_inverse_v2.py \
 #### Override Parameter:
 ```bash
 # Estimate kl instead of ksi (overrides config)
-python scripts/train_inverse_v2.py \
+python scripts/train_inverse.py \
     --config configs/birnn_inverse.yaml \
     --patient 3 \
     --param kl
@@ -142,7 +142,7 @@ python scripts/train_inverse_v2.py \
 ```bash
 # Run on multiple patients
 for patient in 3 5 7; do
-    python scripts/train_inverse_v2.py \
+    python scripts/train_inverse.py \
         --config configs/birnn_inverse.yaml \
         --patient $patient
 done

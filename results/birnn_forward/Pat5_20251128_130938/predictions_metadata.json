@@ -1,0 +1,11 @@
+{
+  "model_name": "birnn",
+  "patient": 5,
+  "data_type": "synthetic",
+  "epochs": 100,
+  "rmse_interpolation": 1.8383548259735107,
+  "rmse_forecast": 5.734488010406494,
+  "rmse_total": 2.5159549713134766,
+  "saved_at": "2025-11-28T13:18:54.366073",
+  "has_latent_states": true
+}
