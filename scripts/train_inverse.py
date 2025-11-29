@@ -203,33 +203,114 @@ def main():
     
     # Evaluate
     metrics = model.evaluate() if hasattr(model, 'evaluate') else {}
-    metrics.update({
-        f'{config.inverse_param}_estimated': history['final_param'],
-        f'{config.inverse_param}_true': true_param_value,
-        f'{config.inverse_param}_error_percent': history['param_error_percent']
-    })
     
-    # Save parameter evolution (NEW!)
+    # Add inverse parameter results (handle both single and multiple params)
+    inverse_params_list = config.inverse_params if isinstance(config.inverse_params, list) else [config.inverse_params]
+    
+    for param in inverse_params_list:
+        if param in history['final_params']:
+            metrics[f'{param}_estimated'] = history['final_params'][param]
+            metrics[f'{param}_true'] = true_param_value if param == inverse_params_list[0] else None
+            if param in history['param_errors_percent']:
+                metrics[f'{param}_error_percent'] = history['param_errors_percent'][param]
+    
+    # Save parameter evolution for each estimated parameter
     if history['param_history']['epochs']:
         import numpy as np
-        pred_mgr.save_parameter_evolution(
-            epochs=np.array(history['param_history']['epochs']),
-            param_values=np.array(history['param_history']['param_values']),
-            param_name=config.inverse_param,
-            true_value=true_param_value,
-            losses=np.array(history['param_history']['losses']),
+        for param in inverse_params_list:
+            param_values_key = f'{param}_values'
+            param_losses_key = f'{param}_losses'
+            
+            if param_values_key in history['param_history']:
+                pred_mgr.save_parameter_evolution(
+                    epochs=np.array(history['param_history']['epochs']),
+                    param_values=np.array(history['param_history'][param_values_key]),
+                    param_name=param,
+                    true_value=true_param_value if param == inverse_params_list[0] else None,
+                    losses=np.array(history['param_history'][param_losses_key]),
             stages=np.array(history['param_history']['stages'])
         )
         print("✅ Parameter evolution saved")
     
+    # ========================================================================
+    # Generate and Save Predictions
+    # ========================================================================
+    print("\n📊 Generating predictions...")
+    
+    # Get model predictions
+    import numpy as np
+    if hasattr(model, 'model'):  # BI-RNN has nested model
+        Y_pred_train = model.model(model.X_train, training=False).numpy()
+        Y_pred_test = model.model(model.X_test, training=False).numpy()
+    else:
+        # For other models
+        Y_pred_train = model.predict(model.X_train)
+        Y_pred_test = model.predict(model.X_test)
+    
+    # Combine train and test
+    Y_pred = np.concatenate([Y_pred_train, Y_pred_test], axis=1)
+    Y_true = np.concatenate([model.Y_train.numpy(), model.Y_test.numpy()], axis=1)
+    
+    # Denormalize
+    glucose_pred = Y_pred[0, :, 0] * data.m_g
+    glucose_true = Y_true[0, :, 0] * data.m_g
+    time = np.arange(len(glucose_pred))
+    split_idx = model.X_train.shape[1]
+    
+    # Prepare metadata with parameter estimates
+    metadata = {
+        'model_name': config.model_name,
+        'patient': f'Pat{config.data.patient}' if hasattr(config.data, 'patient') else 'unknown',
+        'mode': 'inverse',
+        'inverse_params': inverse_params_list,
+        **metrics
+    }
+    
+    # Build predictions dict
+    predictions_dict = {
+        'time': time,
+        'glucose_pred': glucose_pred,
+        'glucose_true': glucose_true,
+        'split_idx': split_idx,
+        'metadata': metadata
+    }
+    
+    # Add latent states if available
+    if data.has_latent_states:
+        predictions_dict.update({
+            'insulin_pred': Y_pred[0, :, 1] * data.m_i,
+            'insulin_true': Y_true[0, :, 1] * data.m_i,
+            'digestion_pred': Y_pred[0, :, 2] * data.m_d,
+            'digestion_true': Y_true[0, :, 2] * data.m_d
+        })
+    
+    # Save predictions
+    pred_mgr.save(**predictions_dict)
+    print("✅ Predictions saved")
+    
+    # Print evaluation metrics
+    print(f"\n{'='*80}")
+    print("EVALUATION METRICS")
+    print(f"{'='*80}")
+    if 'rmse_interpolation' in metrics:
+        print(f"rmse_interpolation: {metrics['rmse_interpolation']:.4f}")
+    if 'rmse_forecast' in metrics:
+        print(f"rmse_forecast: {metrics['rmse_forecast']:.4f}")
+    if 'rmse_total' in metrics:
+        print(f"rmse_total: {metrics['rmse_total']:.4f}")
+    
     # Save final checkpoint
+    # Get error for first parameter (for backward compatibility with is_best check)
+    first_param = inverse_params_list[0]
+    param_error = history['param_errors_percent'].get(first_param, 100)
+    
     checkpoint_mgr.save(
         model=model,
         optimizer=getattr(model, 'optimizer', None),
         epoch=sum(s['epochs'] for s in config.training.stages),
         metrics=metrics,
         is_final=True,
-        is_best=(history['param_error_percent'] < 10)
+        is_best=(param_error < 10)
     )
     print("✅ Checkpoint saved")
     
@@ -240,20 +321,26 @@ def main():
     print("✅ INVERSE TRAINING COMPLETE!")
     print("="*80)
     
+    # Display results for each estimated parameter
     print(f"\n📊 Parameter Estimation:")
-    print(f"   Parameter: {config.inverse_param}")
-    print(f"   Estimated: {history['final_param']:.2f}")
-    print(f"   True value: {true_param_value:.2f}")
-    print(f"   Error: {history['param_error_percent']:.2f}%")
-    
-    if history['param_error_percent'] < 5:
-        print(f"   🎉 Excellent! Error < 5%")
-    elif history['param_error_percent'] < 10:
-        print(f"   ✅ Good! Error < 10%")
-    elif history['param_error_percent'] < 20:
-        print(f"   ⚠️  Acceptable. Error < 20%")
-    else:
-        print(f"   ❌ Poor. Error > 20%")
+    for param in inverse_params_list:
+        if param in history['final_params']:
+            print(f"   Parameter: {param}")
+            print(f"   Estimated: {history['final_params'][param]:.2f}")
+            if param == inverse_params_list[0] and true_param_value is not None:
+                print(f"   True value: {true_param_value:.2f}")
+                if param in history['param_errors_percent']:
+                    error = history['param_errors_percent'][param]
+                    print(f"   Error: {error:.2f}%")
+                    
+                    if error < 5:
+                        print(f"   🎉 Excellent! Error < 5%")
+                    elif error < 10:
+                        print(f"   ✅ Good! Error < 10%")
+                    elif error < 20:
+                        print(f"   ⚠️  Acceptable. Error < 20%")
+                    else:
+                        print(f"   ❌ Poor. Error > 20%")
     
     print(f"\n📁 Output:")
     print(f"   {args.save_dir}")

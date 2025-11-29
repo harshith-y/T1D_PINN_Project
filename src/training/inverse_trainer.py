@@ -346,23 +346,43 @@ class InverseTrainer:
         """
         Compute biological residual for BI-RNN.
         
+        Checks if predicted states satisfy the ODE:
+        y[t+1] ≈ y[t] + dt * f(y[t], u[t], r[t])
+        
         Uses flexible parameter system - any combination of parameters can be trainable.
         """
         from src.physics.magdelaine import get_param_value
         
-        # Denormalize states
+        # Reshape to [Batch*Time, Features]
         y_pred_flat = tf.reshape(Y_pred, [-1, 3])
-        y_in_flat = tf.reshape(self.model.Y_train, [-1, 3])
-        u_in_flat = tf.reshape(self.model.U_train, [-1, 1])
-        r_in_flat = tf.reshape(self.model.R_train, [-1, 1])
+        u_flat = tf.reshape(self.model.U_train, [-1, 1])
+        r_flat = tf.reshape(self.model.R_train, [-1, 1])
         
-        G = y_in_flat[:, 0:1] * self.data.m_g
-        I = y_in_flat[:, 1:2] * self.data.m_i
-        D = y_in_flat[:, 2:3] * self.data.m_d
+        # We need to compute: y[t+1] = y[t] + dt * f(y[t], u[t], r[t])
+        # CRITICAL: Use Y_pred (model's predictions) at time t, not Y_train (ground truth)!
+        # This ensures gradients flow through ksi → ODE → Y_pred consistency
+        
+        # For a sequence of length T, we have T states: [0, 1, 2, ..., T-1]
+        # We can compute T-1 transitions: [0→1, 1→2, ..., T-2→T-1]
+        
+        # PREDICTED states at time t (all except last)
+        y_pred_t = y_pred_flat[:-1, :]  # Shape: [T-1, 3]
+        
+        # PREDICTED states at time t+1 (all except first)  
+        y_pred_t_plus_1 = y_pred_flat[1:, :]  # Shape: [T-1, 3]
+        
+        # Inputs at time t (all except last)
+        u_t = u_flat[:-1, :]  # Shape: [T-1, 1]
+        r_t = r_flat[:-1, :]  # Shape: [T-1, 1]
+        
+        # Denormalize PREDICTED states at time t to physical units
+        G_t = y_pred_t[:, 0:1] * self.data.m_g  # mg/dL
+        I_t = y_pred_t[:, 1:2] * self.data.m_i  # U/dL
+        D_t = y_pred_t[:, 2:3] * self.data.m_d  # mg/dL/min
         
         # Denormalize inputs (use stored max values)
-        ut = u_in_flat * self.model.u_max
-        rt = r_in_flat * self.model.r_max
+        ut = u_t * self.model.u_max  # U/min
+        rt = r_t * self.model.r_max  # g/min
         
         # Get parameters (trainable if in inverse_params_obj, else use preset)
         ksi = get_param_value(self.model.inverse_params_obj, self.model.params, 'ksi')
@@ -373,23 +393,28 @@ class InverseTrainer:
         Tr = get_param_value(self.model.inverse_params_obj, self.model.params, 'Tr')
         kr_Vb = get_param_value(self.model.inverse_params_obj, self.model.params, 'kr_Vb')
         
-        # First-order ODEs
-        dG = (-ksi * I + kl - kb + D)
-        dI = -I / Tu + (ku_Vi / Tu) * ut
-        dD = -D / Tr + (kr_Vb / Tr) * rt
+        # Magdelaine ODEs in physical units
+        dG = -ksi * I_t + kl - kb + D_t  # mg/dL/min
+        dI = -I_t / Tu + (ku_Vi / Tu) * ut  # U/dL/min
+        dD = -D_t / Tr + (kr_Vb / Tr) * rt  # mg/dL/min²
         
-        # Forward Euler with CORRECTED timestep
-        dt = 1.0 / self.data.m_t  # NOT dt = 1.0!
+        # Forward Euler with PHYSICAL timestep (1 minute)
+        dt = 1.0  # minutes (data sampling rate)
         
-        # Normalize derivatives
-        y_next_ode = y_in_flat + dt * tf.concat([
-            dG / self.data.m_g,
-            dI / self.data.m_i,
-            dD / self.data.m_d
+        # Compute next state in physical units
+        G_t_plus_1 = G_t + dt * dG
+        I_t_plus_1 = I_t + dt * dI
+        D_t_plus_1 = D_t + dt * dD
+        
+        # Normalize predicted next states for comparison with NN output
+        y_ode_t_plus_1 = tf.concat([
+            G_t_plus_1 / self.data.m_g,
+            I_t_plus_1 / self.data.m_i,
+            D_t_plus_1 / self.data.m_d
         ], axis=1)
         
-        # Compare with NN prediction
-        return tf.reduce_mean(tf.square(y_next_ode - y_pred_flat))
+        # Compare ODE prediction with NN prediction at time t+1
+        return tf.reduce_mean(tf.square(y_ode_t_plus_1 - y_pred_t_plus_1))
     
     def _train_step_deepxde(
         self,

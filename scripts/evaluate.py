@@ -81,13 +81,26 @@ def evaluate_single(results_dir: Path, k_step: int = None) -> dict:
     }
     
     # Add parameter estimation metrics if available (inverse mode)
-    for param_name in ['ksi', 'kl', 'ku_Vi']:
-        param_data = pred_mgr.load_parameter_evolution(param_name)
-        if param_data is not None:
-            all_metrics[f'{param_name}_estimated'] = float(param_data['param_values'][-1])
-            if 'true_value' in param_data:
-                all_metrics[f'{param_name}_true'] = float(param_data['true_value'])
-                all_metrics[f'{param_name}_error_percent'] = float(param_data['errors_percent'][-1])
+    mode = metadata.get('mode', 'forward')
+    if mode == 'inverse':
+        inverse_params = metadata.get('inverse_params', ['ksi'])
+        if not isinstance(inverse_params, list):
+            inverse_params = [inverse_params]
+        
+        for param_name in inverse_params:
+            param_data = pred_mgr.load_parameter_evolution(param_name)
+            if param_data is not None:
+                # Final estimated value
+                all_metrics[f'{param_name}_estimated'] = float(param_data['param_values'][-1])
+                
+                # True value and error (if available)
+                if 'true_value' in param_data and param_data['true_value'] is not None:
+                    true_val = float(param_data['true_value'])
+                    est_val = float(param_data['param_values'][-1])
+                    
+                    all_metrics[f'{param_name}_true'] = true_val
+                    all_metrics[f'{param_name}_error_percent'] = abs(est_val - true_val) / true_val * 100
+
     
     # k-step evaluation (if requested)
     if k_step is not None:

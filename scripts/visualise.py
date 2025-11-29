@@ -126,22 +126,35 @@ def main():
         print(f"   📈 {name}: {path.name}")
     
     # Also plot parameter evolution if available (inverse mode)
-    if 'parameter_estimates' in metadata or pred_mgr.load_parameter_evolution('ksi') is not None:
-        print("\n   Generating parameter evolution plots...")
+    mode = metadata.get('mode', 'forward')
+    if mode == 'inverse':
+        print("\n   📊 INVERSE MODE: Generating parameter evolution plots...")
         
-        for param_name in ['ksi', 'kl', 'ku_Vi']:
+        # Get list of all estimated parameters
+        inverse_params = metadata.get('inverse_params', ['ksi'])
+        if not isinstance(inverse_params, list):
+            inverse_params = [inverse_params]
+        
+        param_plots_generated = 0
+        for param_name in inverse_params:
             param_data = pred_mgr.load_parameter_evolution(param_name)
             
             if param_data is not None:
-                # Use YOUR plotter's parameter evolution method
+                # Call existing plotter method with correct signature
                 plotter.plot_parameter_evolution(
-                    epochs=param_data['epochs'],
-                    param_values=param_data['param_values'],
+                    param_history=param_data['param_values'].tolist(),
                     true_value=param_data.get('true_value'),
                     param_name=param_name,
-                    save_path=output_dir / f"parameter_evolution_{param_name}.png"
+                    save_name=f"parameter_evolution_{param_name}.png"
                 )
-                print(f"   📈 parameter_evolution_{param_name}.png")
+                print(f"   ✅ parameter_evolution_{param_name}.png")
+                param_plots_generated += 1
+        
+        if param_plots_generated == 0:
+            print("   ⚠️  No parameter evolution data found")
+        else:
+            print(f"   ✅ Generated {param_plots_generated} parameter evolution plot(s)")
+
     
     # ========================================================================
     # FINAL SUMMARY
