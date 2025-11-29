@@ -273,7 +273,43 @@ class InverseTrainer:
         print(f"\n  🔧 DeepXDE Training: Running {epochs} epochs...")
         print(f"     Training params: {train_params}, Training NN: {train_nn}")
         
+        # ============================================================================
+        # CRITICAL: Manually freeze/unfreeze variables to enforce stage separation
+        # ============================================================================
+        # DeepXDE doesn't support external_trainable_variables, so we must manually
+        # set the trainable flag on TensorFlow variables to control what gets updated.
+        
+        # Step 1: Collect all inverse parameter variables
+        inverse_param_vars = []
+        if hasattr(self.model, 'inverse_params') and self.model.inverse_params:
+            inverse_param_vars = self.model.inverse_params  # List of tf.Variable
+        
+        # Step 2: Collect all NN weight variables (excluding inverse params)
+        nn_weight_vars = []
+        if hasattr(self.model.model, 'trainable_variables'):
+            all_trainable = self.model.model.trainable_variables
+            for var in all_trainable:
+                # Only include if it's NOT an inverse parameter
+                if var not in inverse_param_vars:
+                    nn_weight_vars.append(var)
+        
+        # Step 3: Set trainable flags based on stage configuration
+        print(f"     Freezing variables for stage separation...")
+        
+        # Freeze/unfreeze inverse parameters
+        for var in inverse_param_vars:
+            var._trainable = train_params  # True to train, False to freeze
+        
+        # Freeze/unfreeze NN weights
+        for var in nn_weight_vars:
+            var._trainable = train_nn  # True to train, False to freeze
+        
+        print(f"        Inverse params ({len(inverse_param_vars)} vars): {'TRAINING' if train_params else 'FROZEN'}")
+        print(f"        NN weights ({len(nn_weight_vars)} vars): {'TRAINING' if train_nn else 'FROZEN'}")
+        
+        # ============================================================================
         # CRITICAL FIX: Use callback to track parameters during training
+        # ============================================================================
         import deepxde as dde
         
         class ParameterTracker(dde.callbacks.Callback):
@@ -369,6 +405,15 @@ class InverseTrainer:
                 if param_name == self.inverse_params_list[0] and self.true_param_value is not None:
                     error = abs(param_value - self.true_param_value) / self.true_param_value * 100
                     print(f"        Error: {error:.2f}%")
+        
+        # ============================================================================
+        # CLEANUP: Unfreeze all variables for next stage
+        # ============================================================================
+        # Reset trainable flags to True so next stage can control them fresh
+        for var in inverse_param_vars:
+            var._trainable = True
+        for var in nn_weight_vars:
+            var._trainable = True
         
         return cumulative_epoch + epochs
     
