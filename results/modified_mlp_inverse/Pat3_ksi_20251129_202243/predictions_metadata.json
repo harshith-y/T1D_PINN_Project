@@ -1,0 +1,16 @@
+{
+  "model_name": "modified_mlp",
+  "patient": "PatPat3",
+  "mode": "inverse",
+  "inverse_params": [
+    "ksi"
+  ],
+  "rmse_interpolation": 33.544097900390625,
+  "rmse_forecast": 26.99163055419922,
+  "rmse_total": 32.94566345214844,
+  "ksi_estimated": NaN,
+  "ksi_true": 274.0,
+  "ksi_error_percent": NaN,
+  "saved_at": "2025-11-29T20:34:29.834529",
+  "has_latent_states": true
+}

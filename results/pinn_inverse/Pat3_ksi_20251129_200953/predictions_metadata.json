@@ -1,0 +1,16 @@
+{
+  "model_name": "pinn",
+  "patient": "PatPat3",
+  "mode": "inverse",
+  "inverse_params": [
+    "ksi"
+  ],
+  "rmse_interpolation": 28.582565307617188,
+  "rmse_forecast": 27.751598358154297,
+  "rmse_total": 28.500301361083984,
+  "ksi_estimated": NaN,
+  "ksi_true": 274.0,
+  "ksi_error_percent": NaN,
+  "saved_at": "2025-11-29T20:18:12.174233",
+  "has_latent_states": true
+}

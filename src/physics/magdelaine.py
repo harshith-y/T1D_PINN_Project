@@ -62,11 +62,31 @@ class InverseParams:
                 variables.append(var)
         return variables
     
-    def get_param_value(self, param_name: str) -> Optional[float]:
-        """Get current value of a parameter (exp(log_param))."""
+    def get_param_value(self, param_name: str, as_float: bool = True) -> Optional[float]:
+        """
+        Get current value of a parameter (exp(log_param)).
+        
+        Args:
+            param_name: Name of parameter
+            as_float: If True, convert to Python float (only works in eager mode).
+                     If False, return TensorFlow tensor (works in both modes).
+        
+        Returns:
+            Parameter value as float (if as_float=True and eager mode) or tensor
+        """
         log_var = getattr(self, f'log_{param_name}', None)
         if log_var is not None:
-            return float(tf.exp(log_var).numpy())
+            tensor_val = tf.exp(log_var)
+            
+            if as_float:
+                # Try to convert to float - works in eager mode, fails in graph mode
+                try:
+                    return float(tensor_val.numpy())
+                except AttributeError:
+                    # Graph mode - can't call .numpy(), return tensor instead
+                    return tensor_val
+            else:
+                return tensor_val
         return None
 
 

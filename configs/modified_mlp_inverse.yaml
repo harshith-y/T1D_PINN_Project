@@ -1,5 +1,5 @@
 # Configuration for Modified-MLP PINN Inverse Training
-# Modified-MLP uses custom gated architecture with U-V encoding
+# FIXED VERSION with correct loss weights
 
 model_name: modified_mlp
 mode: inverse
@@ -18,20 +18,24 @@ architecture:
 
 # Multi-stage training configuration
 training:
+  # CRITICAL: All stages need physics losses!
+  # Modified-MLP uses different optimized weights from Bayesian optimization
+  
   stages:
     - name: stage1_params_only
-      epochs: 5000
+      epochs: 500
       learning_rate: 1.0e-3
-      loss_weights: [1.0, 0.0, 0.0, 0.0]
+      # Use full optimized loss weights (not zeros!)
+      loss_weights: [0.89, 5.84, 8.53, 9.91]
       train_inverse_params: true
       train_nn_weights: false
       optimizer: adam
       display_every: 500
     
     - name: stage2_nn_only
-      epochs: 8000
+      epochs: 800
       learning_rate: 5.0e-4
-      # Modified-MLP uses different loss weights (from Bayesian optimization)
+      # Same optimized weights
       loss_weights: [0.89, 5.84, 8.53, 9.91]
       train_inverse_params: false
       train_nn_weights: true
@@ -39,8 +43,9 @@ training:
       display_every: 500
     
     - name: stage3_joint
-      epochs: 2000
+      epochs: 200
       learning_rate: 2.0e-4
+      # Same optimized weights
       loss_weights: [0.89, 5.84, 8.53, 9.91]
       train_inverse_params: true
       train_nn_weights: true

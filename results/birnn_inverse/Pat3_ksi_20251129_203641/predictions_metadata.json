@@ -1,0 +1,16 @@
+{
+  "model_name": "birnn",
+  "patient": "PatPat5",
+  "mode": "inverse",
+  "inverse_params": [
+    "ksi"
+  ],
+  "rmse_interpolation": 0.8076906800270081,
+  "rmse_forecast": 0.23157620429992676,
+  "rmse_total": 0.7697341442108154,
+  "ksi_estimated": 369.3765563964844,
+  "ksi_true": 274.0,
+  "ksi_error_percent": 34.80896218849795,
+  "saved_at": "2025-11-29T20:51:02.640411",
+  "has_latent_states": true
+}

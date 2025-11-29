@@ -1,5 +1,5 @@
 # Configuration for Feedforward PINN Inverse Training
-# This config implements the 3-stage training strategy from your notebooks
+# FIXED VERSION with correct loss weights for all stages
 
 model_name: pinn
 mode: inverse
@@ -19,50 +19,40 @@ architecture:
 # Multi-stage training configuration
 training:
   # ========================================================================
-  # STAGE 1: Train inverse parameters ONLY (freeze NN weights)
-  # ========================================================================
-  # Goal: Get rough estimate of ksi using only glucose observations
+  # CRITICAL FIX: All stages MUST include physics losses!
   # Loss weights: [glucose_obs, ode_g, ode_i, ode_d]
-  #               [1.0, 0.0, 0.0, 0.0] = only penalize glucose observations
-  # ========================================================================
-  
-  # ========================================================================
-  # STAGE 2: Train NN weights ONLY (freeze inverse parameters)
-  # ========================================================================
-  # Goal: Learn accurate state representations with fixed ksi from Stage 1
-  # Loss weights: [7.5, 0.9, 0.18, 4.6] = balanced physics + observations
-  # ========================================================================
-  
-  # ========================================================================
-  # STAGE 3: Joint fine-tuning (train both together)
-  # ========================================================================
-  # Goal: Refine both ksi and NN weights for optimal fit
-  # Loss weights: Same as Stage 2
+  # 
+  # Stage 1: Train inverse params with FULL PHYSICS
+  # Stage 2: Train NN weights with full physics
+  # Stage 3: Joint fine-tuning
   # ========================================================================
   
   stages:
     - name: stage1_params_only
-      epochs: 5000
+      epochs: 500
       learning_rate: 1.0e-3
-      loss_weights: [1.0, 0.0, 0.0, 0.0]
+      # CRITICAL: Must include ODE losses for physics guidance!
+      loss_weights: [3.32, 5.97, 4.70, 2.71]
       train_inverse_params: true
       train_nn_weights: false
       optimizer: adam
       display_every: 500
     
     - name: stage2_nn_only
-      epochs: 8000
+      epochs: 800
       learning_rate: 5.0e-4
-      loss_weights: [7.5, 0.9, 0.18, 4.6]
+      # Same physics losses
+      loss_weights: [3.32, 5.97, 4.70, 2.71]
       train_inverse_params: false
       train_nn_weights: true
       optimizer: adam
       display_every: 500
     
     - name: stage3_joint
-      epochs: 2000
+      epochs: 200
       learning_rate: 2.0e-4
-      loss_weights: [7.5, 0.9, 0.18, 4.6]
+      # Same physics losses
+      loss_weights: [3.32, 5.97, 4.70, 2.71]
       train_inverse_params: true
       train_nn_weights: true
       optimizer: adam
@@ -86,7 +76,7 @@ output:
   checkpoint_freq: 1000
   log_freq: 500
   save_best_only: false
-  wandb_project: null  # Set to enable Weights & Biases logging
+  wandb_project: null
 
 # Compute settings
 device: cpu

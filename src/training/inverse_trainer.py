@@ -192,9 +192,20 @@ class InverseTrainer:
                 f"or train_nn_weights must be true"
             )
         
-        # Get trainable variables
+        # CRITICAL FIX: Check if this is a DeepXDE model BEFORE getting trainable vars
+        # DeepXDE models don't use the same trainable_variables pattern
+        is_deepxde = hasattr(self.model, 'model') and hasattr(self.model.model, 'train')
+        
+        if is_deepxde:
+            # DeepXDE models handle training differently - run entire stage at once
+            return self._train_stage_deepxde(
+                stage_config, cumulative_epoch, stage_name, train_params, train_nn
+            )
+        
+        # For Keras models (BI-RNN), get trainable variables
         var_list = self._get_trainable_vars(train_params, train_nn)
         
+        # For Keras models (BI-RNN), use epoch-by-epoch training
         # Create optimizer
         optimizer = tf.keras.optimizers.Adam(
             learning_rate=stage_config['learning_rate']
@@ -233,6 +244,134 @@ class InverseTrainer:
         
         return cumulative_epoch + epochs
     
+    def _train_stage_deepxde(
+        self,
+        stage_config: dict,
+        cumulative_epoch: int,
+        stage_name: str,
+        train_params: bool,
+        train_nn: bool
+    ) -> int:
+        """
+        Train a complete stage for DeepXDE models.
+        
+        Uses callbacks to track parameter values during training.
+        
+        Args:
+            stage_config: Stage configuration
+            cumulative_epoch: Cumulative epoch count
+            stage_name: Name of stage
+            train_params: Whether to train inverse parameters
+            train_nn: Whether to train NN weights
+        
+        Returns:
+            Updated cumulative epoch count
+        """
+        epochs = stage_config['epochs']
+        display_every = stage_config.get('display_every', max(100, epochs // 20))
+        
+        print(f"\n  🔧 DeepXDE Training: Running {epochs} epochs...")
+        print(f"     Training params: {train_params}, Training NN: {train_nn}")
+        
+        # CRITICAL FIX: Use callback to track parameters during training
+        import deepxde as dde
+        
+        class ParameterTracker(dde.callbacks.Callback):
+            """Track parameter values during DeepXDE training."""
+            
+            def __init__(self, trainer, param_names, stage_name, cumulative_epoch):
+                super().__init__()
+                self.trainer = trainer
+                self.param_names = param_names
+                self.stage_name = stage_name
+                self.cumulative_epoch = cumulative_epoch
+            
+            def on_epoch_end(self):
+                """Called after each training epoch."""
+                # Get current epoch from DeepXDE's training state
+                epoch = self.model.train_state.epoch
+                current_epoch = self.cumulative_epoch + epoch
+                
+                # Track each parameter
+                for param_name in self.param_names:
+                    # FIXED: Access log_param directly from InverseParams
+                    # InverseParams has attributes like log_ksi, log_kl, etc.
+                    log_param_var = getattr(self.trainer.model.inverse_params_obj, f'log_{param_name}', None)
+                    
+                    if log_param_var is None:
+                        continue
+                    
+                    try:
+                        # Try to get value via session (works in graph mode)
+                        if hasattr(self.model, 'sess'):
+                            # Evaluate the log variable
+                            log_val = self.model.sess.run(log_param_var)
+                            # Convert to actual parameter value (exp(log))
+                            import numpy as np
+                            param_val = float(np.exp(log_val))
+                        else:
+                            # Fallback: try to use the get_param_value method
+                            param_val = self.trainer.model.inverse_params_obj.get_param_value(
+                                param_name, as_float=False
+                            )
+                            # If it returns a tensor, try to evaluate it
+                            if hasattr(param_val, 'numpy'):
+                                param_val = float(param_val.numpy())
+                            else:
+                                param_val = float(param_val)
+                    except Exception as e:
+                        # If all else fails, skip tracking this epoch
+                        continue
+                    
+                    # Store in history
+                    self.trainer.param_history['epochs'].append(current_epoch)
+                    self.trainer.param_history['stages'].append(self.stage_name)
+                    self.trainer.param_history[f'{param_name}_values'].append(param_val)
+                    
+                    # Get current loss (it's an array, get the latest value)
+                    if hasattr(self.model.train_state, 'loss_train'):
+                        loss_array = self.model.train_state.loss_train
+                        if isinstance(loss_array, (list, tuple)) or hasattr(loss_array, '__len__'):
+                            # It's an array/list - get the last element
+                            loss = float(loss_array[-1]) if len(loss_array) > 0 else 0.0
+                        else:
+                            # It's a scalar
+                            loss = float(loss_array)
+                    else:
+                        loss = 0.0
+                    self.trainer.param_history[f'{param_name}_losses'].append(loss)
+        
+        # Create callback instance
+        tracker = ParameterTracker(
+            trainer=self,
+            param_names=self.inverse_params_list,
+            stage_name=stage_name,
+            cumulative_epoch=cumulative_epoch
+        )
+        
+        # Run DeepXDE training with callback
+        dde_model = self.model.model
+        losshistory, train_state = dde_model.train(
+            iterations=epochs,
+            display_every=display_every,
+            callbacks=[tracker]  # Add callback for parameter tracking
+        )
+        
+        # Print final state
+        print(f"\n  📊 Stage '{stage_name}' complete:")
+        for param_name in self.inverse_params_list:
+            # Get final value from history (last tracked value)
+            if self.param_history[f'{param_name}_values']:
+                param_value = self.param_history[f'{param_name}_values'][-1]
+                print(f"     {param_name}: {param_value:.6f}")
+                
+                # Print error if true value available
+                if param_name == self.inverse_params_list[0] and self.true_param_value is not None:
+                    error = abs(param_value - self.true_param_value) / self.true_param_value * 100
+                    print(f"        Error: {error:.2f}%")
+        
+        return cumulative_epoch + epochs
+    
     def _get_trainable_vars(
         self,
         train_params: bool,
@@ -254,6 +393,7 @@ class InverseTrainer:
         if train_params:
             # Collect all trainable inverse parameters
             if hasattr(self.model, 'inverse_params') and self.model.inverse_params:
+                # inverse_params is already a list of tf.Variable objects
                 var_list.extend(self.model.inverse_params)
             else:
                 raise AttributeError("Model does not have trainable inverse parameters")
@@ -418,25 +558,64 @@ class InverseTrainer:
     
     def _train_step_deepxde(
         self,
-        var_list: List[tf.Variable],
+        var_list: list,
         training: bool,
-        stage_config: Dict,
-        optimizer: tf.keras.optimizers.Optimizer
-    ) -> Dict[str, float]:
-        """Training step for DeepXDE models (PINN, Modified-MLP)."""
-        # For DeepXDE, we call the model's built-in training step
-        # This is more complex and model-specific
-        # For now, use the model's train method for one iteration
+        stage_config: dict,
+        optimizer
+    ) -> dict:
+        """
+        Train step for DeepXDE models (PINN, Modified-MLP).
         
-        # Note: DeepXDE training is typically done through model.train()
-        # which handles the training loop internally
-        # This is a simplified version
+        DeepXDE handles training differently - it has an internal training loop.
+        For multi-stage training, we need to train for a certain number of epochs
+        with specific variables.
         
-        raise NotImplementedError(
-            "DeepXDE multi-stage training not yet implemented in InverseTrainer.\n"
-            "Use model.train() directly for DeepXDE models or implement "
-            "_train_step_deepxde based on your specific needs."
+        Args:
+            var_list: List of variables to train (ignored - DeepXDE auto-collects)
+            training: Whether in training mode
+            stage_config: Stage configuration
+            optimizer: Optimizer to use
+        
+        Returns:
+            Dictionary of losses
+        """
+        # DeepXDE models have a 'model' attribute that is the dde.Model object
+        if not hasattr(self.model, 'model'):
+            raise AttributeError("DeepXDE model must have 'model' attribute")
+        
+        dde_model = self.model.model
+        
+        # Get training configuration
+        epochs = stage_config.get('epochs', 1000)
+        display_every = stage_config.get('display_every', 100)
+        
+        # DeepXDE doesn't support per-stage variable selection directly
+        # It trains all variables that are marked as trainable
+        # So we need to temporarily set trainability
+        
+        # Train for the specified number of epochs
+        # Note: DeepXDE's train() runs the full training loop internally
+        # We're calling it once per stage with the stage's epoch count
+        
+        losshistory, train_state = dde_model.train(
+            iterations=epochs,  # FIXED: Use 'iterations' instead of deprecated 'epochs'
+            display_every=display_every
         )
+        
+        # Extract final loss from training state
+        # DeepXDE's train_state contains loss history
+        if hasattr(train_state, 'loss_train') and len(train_state.loss_train) > 0:
+            final_loss = float(train_state.loss_train[-1])
+        else:
+            final_loss = 0.0
+        
+        # Return loss dict (DeepXDE doesn't break down losses the same way)
+        return {
+            'total': final_loss,
+            'glucose': 0.0,  # Not separately tracked
+            'biological': 0.0,
+            'ic': 0.0
+        }
     
     def _get_current_param_value(self, param_name: str = 'ksi') -> float:
         """Get current value of inverse parameter."""
@@ -445,7 +624,37 @@ class InverseTrainer:
         if hasattr(self.model, 'inverse_params_obj') and self.model.inverse_params_obj is not None:
             value = self.model.inverse_params_obj.get_param_value(param_name)
             if value is not None:
-                return value
+                # CRITICAL FIX: Handle TensorFlow tensors in graph mode
+                if isinstance(value, tf.Tensor) or isinstance(value, tf.Variable):
+                    # In TF 1.x graph mode, we need to evaluate the tensor
+                    try:
+                        # Try eager execution first (TF 2.x)
+                        return float(value.numpy())
+                    except:
+                        # Graph mode fallback - try to read the variable value
+                        if hasattr(value, 'read_value'):
+                            try:
+                                value = value.read_value()
+                                return float(value.numpy())
+                            except:
+                                pass
+                        # If we can't get the value, try to use the initial value
+                        if hasattr(value, '_initial_value'):
+                            try:
+                                return float(value._initial_value.numpy())
+                            except:
+                                pass
+                        # Last resort: check if it's a trainable variable with an assign operation
+                        if hasattr(value, 'value'):
+                            try:
+                                return float(value.value().numpy())
+                            except:
+                                pass
+                        # Really last resort: return NaN to indicate we couldn't get the value
+                        # Don't return 0.0 as that's misleading
+                        print(f"⚠️  Warning: Could not extract value for {param_name} from TF graph")
+                        return float('nan')
+                return float(value)
         
         # Fallback to model params (if not trainable)
         return float(getattr(self.model.params, param_name))

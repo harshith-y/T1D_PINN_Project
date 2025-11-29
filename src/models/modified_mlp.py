@@ -239,7 +239,8 @@ class ModifiedMLPPINN:
         self.model = None
         self.data_window = None
         self.params = None
-        self.inverse_params = None
+        self.inverse_params_obj = None  # The InverseParams object
+        self.inverse_params = []  # List of trainable variables
         self.lookup = None
         self.scales = None
         self.geom = None
@@ -271,23 +272,46 @@ class ModifiedMLPPINN:
                 inverse_params_list = [inverse_params_list]
             
             # Create inverse parameters with random initialization
-            self.inverse_params = make_inverse_params(
+            self.inverse_params_obj = make_inverse_params(
                 param_list=inverse_params_list,
                 true_params=self.params,
                 random_init=True
             )
+            # Extract list of variables for training
+            self.inverse_params = self.inverse_params_obj.get_all_variables()
             
             # Print initialization info
             print(f"\n🔬 Inverse Training - Initializing Parameters:")
             print(f"   Estimating: {inverse_params_list}")
-            for param_name in inverse_params_list:
-                true_value = getattr(self.params, param_name)
-                estimated_value = self.inverse_params.get_param_value(param_name)
-                error = abs(estimated_value - true_value) / true_value * 100
-                print(f"   {param_name}: True={true_value:.6f}, Init={estimated_value:.6f}, Error={error:.1f}%")
+            
+            # In TF 1.x graph mode (DeepXDE), we can't evaluate tensors during __init__
+            try:
+                # Try to get values - works in TF 2.x eager mode
+                for param_name in inverse_params_list:
+                    true_value = getattr(self.params, param_name)
+                    estimated_value = self.inverse_params_obj.get_param_value(param_name, as_float=True)
+                    
+                    # If we got a tensor (graph mode), skip printing details
+                    if isinstance(estimated_value, (tf.Tensor, tf.Variable)):
+                        raise AttributeError("Graph mode - can't evaluate")
+                    
+                    error = abs(estimated_value - true_value) / true_value * 100
+                    print(f"   {param_name}:")
+                    print(f"      True:    {true_value:.6f}")
+                    print(f"      Initial: {estimated_value:.6f} (random)")
+                    print(f"      Error:   {error:.1f}%")
+            except (AttributeError, TypeError):
+                # Graph mode - can't evaluate tensors yet
+                for param_name in inverse_params_list:
+                    true_value = getattr(self.params, param_name)
+                    print(f"   {param_name}:")
+                    print(f"      True:    {true_value:.6f}")
+                    print(f"      Initial: (random, will be shown during training)")
+            
             print(f"   ✅ Initialized {len(inverse_params_list)} parameter(s)\n")
         else:
-            self.inverse_params = make_inverse_params(param_list=None)
+            self.inverse_params_obj = make_inverse_params(param_list=None)
+            self.inverse_params = []
         
         # Create input lookup tables
         self.lookup = InputLookup(data_window.u, data_window.r)
@@ -389,7 +413,7 @@ class ModifiedMLPPINN:
                 params=self.params,
                 lookup=self.lookup,
                 scales=self.scales,
-                inverse=self.inverse_params,
+                inverse=self.inverse_params_obj,
                 include_prior=False
             )
         

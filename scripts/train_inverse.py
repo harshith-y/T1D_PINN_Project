@@ -237,25 +237,24 @@ def main():
     # ========================================================================
     print("\n📊 Generating predictions...")
     
-    # Get model predictions
-    import numpy as np
-    if hasattr(model, 'model'):  # BI-RNN has nested model
-        Y_pred_train = model.model(model.X_train, training=False).numpy()
-        Y_pred_test = model.model(model.X_test, training=False).numpy()
-    else:
-        # For other models
-        Y_pred_train = model.predict(model.X_train)
-        Y_pred_test = model.predict(model.X_test)
+    # Use the prediction extractor utility (handles all model types)
+    from src.training.prediction_extractor import extract_predictions
     
-    # Combine train and test
-    Y_pred = np.concatenate([Y_pred_train, Y_pred_test], axis=1)
-    Y_true = np.concatenate([model.Y_train.numpy(), model.Y_test.numpy()], axis=1)
+    predictions = extract_predictions(
+        model=model,
+        data=data,
+        model_type=config.model_name
+    )
     
-    # Denormalize
-    glucose_pred = Y_pred[0, :, 0] * data.m_g
-    glucose_true = Y_true[0, :, 0] * data.m_g
-    time = np.arange(len(glucose_pred))
-    split_idx = model.X_train.shape[1]
+    # Extract arrays
+    time = predictions['time']
+    glucose_pred = predictions['glucose_pred']
+    glucose_true = predictions['glucose_true']
+    insulin_pred = predictions.get('insulin_pred')
+    insulin_true = predictions.get('insulin_true')
+    digestion_pred = predictions.get('digestion_pred')
+    digestion_true = predictions.get('digestion_true')
+    split_idx = predictions.get('split_idx', int(0.8 * len(time)))
     
     # Prepare metadata with parameter estimates
     metadata = {
@@ -276,12 +275,12 @@ def main():
     }
     
     # Add latent states if available
-    if data.has_latent_states:
+    if insulin_pred is not None:
         predictions_dict.update({
-            'insulin_pred': Y_pred[0, :, 1] * data.m_i,
-            'insulin_true': Y_true[0, :, 1] * data.m_i,
-            'digestion_pred': Y_pred[0, :, 2] * data.m_d,
-            'digestion_true': Y_true[0, :, 2] * data.m_d
+            'insulin_pred': insulin_pred,
+            'insulin_true': insulin_true,
+            'digestion_pred': digestion_pred,
+            'digestion_true': digestion_true
         })
     
     # Save predictions
