@@ -205,8 +205,8 @@ class InverseTrainer:
         display_every = stage_config.get('display_every', max(100, epochs // 20))
         
         for epoch in range(epochs):
-            # Training step
-            loss_dict = self._train_step(var_list, train_nn, stage_config)
+            # Training step (pass optimizer to training step)
+            loss_dict = self._train_step(var_list, train_nn, stage_config, optimizer)
             
             # Track parameters (every 10 epochs)
             if epoch % 10 == 0:
@@ -273,7 +273,8 @@ class InverseTrainer:
         self,
         var_list: List[tf.Variable],
         training: bool,
-        stage_config: Dict
+        stage_config: Dict,
+        optimizer: tf.keras.optimizers.Optimizer
     ) -> Dict[str, float]:
         """
         Execute one training step.
@@ -282,26 +283,27 @@ class InverseTrainer:
             var_list: Variables to update
             training: Whether to run model in training mode (for NN layers)
             stage_config: Stage configuration with loss_weights
+            optimizer: Optimizer instance for this stage
         
         Returns:
             Dictionary of loss values
         """
         if self.model_type == 'birnn':
-            return self._train_step_birnn(var_list, training, stage_config)
+            return self._train_step_birnn(var_list, training, stage_config, optimizer)
         else:
-            return self._train_step_deepxde(var_list, training, stage_config)
+            return self._train_step_deepxde(var_list, training, stage_config, optimizer)
     
     def _train_step_birnn(
         self,
         var_list: List[tf.Variable],
         training: bool,
-        stage_config: Dict
+        stage_config: Dict,
+        optimizer: tf.keras.optimizers.Optimizer
     ) -> Dict[str, float]:
         """Training step for BI-RNN model."""
         with tf.GradientTape() as tape:
-            # Watch all variables
-            for var in var_list:
-                tape.watch(var)
+            # In TF 2.x eager mode, tape automatically watches all tf.Variable objects
+            # No need to manually watch variables
             
             # Forward pass
             Y_pred = self.model.model(self.model.X_train, training=training)
@@ -330,8 +332,8 @@ class InverseTrainer:
         # Compute gradients
         gradients = tape.gradient(total_loss, var_list)
         
-        # Apply gradients
-        self.model.optimizer.apply_gradients(zip(gradients, var_list))
+        # Apply gradients using the stage's optimizer (not model's optimizer!)
+        optimizer.apply_gradients(zip(gradients, var_list))
         
         return {
             'total': float(total_loss),
@@ -393,7 +395,8 @@ class InverseTrainer:
         self,
         var_list: List[tf.Variable],
         training: bool,
-        stage_config: Dict
+        stage_config: Dict,
+        optimizer: tf.keras.optimizers.Optimizer
     ) -> Dict[str, float]:
         """Training step for DeepXDE models (PINN, Modified-MLP)."""
         # For DeepXDE, we call the model's built-in training step
