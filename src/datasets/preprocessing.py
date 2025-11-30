@@ -23,20 +23,20 @@ def upsample_glucose_to_min(
 ) -> pd.DataFrame:
     """
     Resample CGM (typically every 5 min) to a 1-min grid via time interpolation.
-    
+
     This function takes sparse CGM measurements (usually every 5 minutes) and
     interpolates them to a regular 1-minute grid. Duplicate timestamps are
     averaged, and missing values are interpolated linearly.
-    
+
     Args:
         df_cgm: DataFrame with timestamp and glucose columns
         time_col: Name of timestamp column (default "timestamp")
         value_col: Name of glucose column (default auto-detected)
         assume_local: Whether to assume local timezone (default True)
-        
+
     Returns:
         DataFrame with columns [time_col, 'glucose'] at 1-minute resolution
-        
+
     Example:
         >>> df = pd.DataFrame({
         ...     'timestamp': ['2024-01-01 00:00:00', '2024-01-01 00:05:00'],
@@ -71,11 +71,7 @@ def upsample_glucose_to_min(
     df = df.dropna(subset=[value_col])
 
     # Average duplicate timestamps
-    df = (
-        df.groupby(time_col, as_index=False)[value_col]
-        .mean()
-        .sort_values(time_col)
-    )
+    df = df.groupby(time_col, as_index=False)[value_col].mean().sort_values(time_col)
 
     # Set index to timestamp for resampling
     df = df.set_index(time_col)
@@ -115,7 +111,7 @@ def project_events_to_grid(
 ) -> pd.DataFrame:
     """
     Project long-form events (basal U/hr, bolus U, carbs g) onto a 1-minute grid.
-    
+
     This function takes event data in long format and creates per-minute time series
     for insulin delivery (u) and carbohydrate intake (r). It handles:
     - Basal rates (U/hr → U/min, step function)
@@ -123,7 +119,7 @@ def project_events_to_grid(
     - Pump suspend/resume events
     - Bolus doses (U, impulse)
     - Carbohydrate intake (g, impulse)
-    
+
     Args:
         df_events: Long-form events DataFrame
         start: Start timestamp for output grid
@@ -133,12 +129,12 @@ def project_events_to_grid(
         value_col: Name of value column
         units_col: Name of units column (optional)
         duration_col: Name of duration column (optional, for basal)
-        
+
     Returns:
         DataFrame indexed per minute with columns:
             - u: total insulin input per minute (U/min) [basal + bolus]
             - r: carb input per minute (g/min)
-            
+
     Example:
         >>> events = pd.DataFrame({
         ...     'timestamp': ['2024-01-01 00:00:00', '2024-01-01 00:05:00'],
@@ -194,7 +190,9 @@ def project_events_to_grid(
     ev = ev.dropna(subset=[time_col])
 
     # Create per-minute index
-    minute_idx = pd.date_range(start.floor("min"), end.ceil("min"), freq="1min", tz=start.tz)
+    minute_idx = pd.date_range(
+        start.floor("min"), end.ceil("min"), freq="1min", tz=start.tz
+    )
     u = pd.Series(0.0, index=minute_idx, name="u")  # U/min (rate + bolus)
     r = pd.Series(0.0, index=minute_idx, name="r")  # g/min
 
@@ -202,7 +200,9 @@ def project_events_to_grid(
     basal = ev[ev[type_col].str.lower().eq("basal")]
     if not basal.empty:
         # Persist each basal rate until the next basal event
-        basal = basal[[time_col, value_col, units_col]].rename(columns={value_col: "rate", units_col: "units"})
+        basal = basal[[time_col, value_col, units_col]].rename(
+            columns={value_col: "rate", units_col: "units"}
+        )
         # Sanity: if units differ, you can insert conversions here
         basal["rate_u_per_min"] = basal["rate"].astype(float) / 60.0
         basal = basal.reset_index(drop=True)
@@ -217,7 +217,9 @@ def project_events_to_grid(
     # 2b) Temporary basal segments (optional)
     if "temp_basal" in ev[type_col].str.lower().unique():
         tb = ev[ev[type_col].str.lower().eq("temp_basal")].copy()
-        tb = tb[[time_col, value_col, units_col, duration_col]].rename(columns={value_col: "rate", units_col: "units"})
+        tb = tb[[time_col, value_col, units_col, duration_col]].rename(
+            columns={value_col: "rate", units_col: "units"}
+        )
         tb["rate_u_per_min"] = tb["rate"].astype(float) / 60.0
         for _, row in tb.iterrows():
             t0 = row[time_col].floor("min")

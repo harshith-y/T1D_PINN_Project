@@ -10,10 +10,12 @@ from .preprocessing import (
     project_events_to_grid,
 )
 
+
 @dataclass
 class _CoveragePolicy:
-    max_gap_min: int = 10      # max gap tolerated as "continuous"
-    min_coverage: float = 0.9 # fraction of minutes that must have CGM
+    max_gap_min: int = 10  # max gap tolerated as "continuous"
+    min_coverage: float = 0.9  # fraction of minutes that must have CGM
+
 
 def _standardize_cgm(df_cgm: pd.DataFrame) -> pd.DataFrame:
     df = df_cgm.rename(columns={c: c.lower() for c in df_cgm.columns})
@@ -24,34 +26,42 @@ def _standardize_cgm(df_cgm: pd.DataFrame) -> pd.DataFrame:
     df = df.dropna(subset=["timestamp"]).sort_values("timestamp").reset_index(drop=True)
     return df
 
+
 def _standardize_events(df_events: pd.DataFrame) -> pd.DataFrame:
     df = df_events.rename(columns={c: c.lower() for c in df_events.columns})
     # expected columns: timestamp, kind, value
-    if not {"timestamp","kind","value"}.issubset(df.columns):
+    if not {"timestamp", "kind", "value"}.issubset(df.columns):
         raise ValueError("events.csv must have columns: timestamp, kind, value")
     df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
     df = df.dropna(subset=["timestamp"]).sort_values("timestamp").reset_index(drop=True)
     # keep only the 3 kinds we use
-    df = df[df["kind"].isin(["basal","bolus","carbs"])].reset_index(drop=True)
+    df = df[df["kind"].isin(["basal", "bolus", "carbs"])].reset_index(drop=True)
     return df
 
-def _contiguous_blocks_1min(idx: pd.DatetimeIndex, policy:_CoveragePolicy) -> List[slice]:
+
+def _contiguous_blocks_1min(
+    idx: pd.DatetimeIndex, policy: _CoveragePolicy
+) -> List[slice]:
     # expects 1-min regular index; we'll still be tolerant to small gaps.
     if len(idx) == 0:
         return []
     blocks = []
     start = 0
     for i in range(1, len(idx)):
-        gap = (idx[i] - idx[i-1]).total_seconds() / 60.0
+        gap = (idx[i] - idx[i - 1]).total_seconds() / 60.0
         if gap > policy.max_gap_min:
             blocks.append(slice(start, i))
             start = i
     blocks.append(slice(start, len(idx)))
     return blocks
 
-def _check_coverage(minute_index: pd.DatetimeIndex, covered_mask: np.ndarray, policy:_CoveragePolicy) -> bool:
+
+def _check_coverage(
+    minute_index: pd.DatetimeIndex, covered_mask: np.ndarray, policy: _CoveragePolicy
+) -> bool:
     # covered_mask is True where we have CGM values (not NaN) on the minute grid
     return covered_mask.mean() >= policy.min_coverage
+
 
 def _assemble_window_dict(
     time_index: List[str],
@@ -60,7 +70,7 @@ def _assemble_window_dict(
     r: np.ndarray,
     patient_label: str,
     dt_minutes: float,
-    meta: Dict[str, Any]
+    meta: Dict[str, Any],
 ) -> Dict[str, Any]:
     """
     Assemble window in JSON-ready format for prepare_data.py.
@@ -69,14 +79,14 @@ def _assemble_window_dict(
     T = len(time_index)
     t_min = np.arange(T, dtype=float) * dt_minutes
     m_t = float(t_min.max()) if T > 0 else 1.0
-    
+
     # Scaling factors
     m_g = float(np.nanmax(glucose)) if np.nanmax(glucose) > 0 else 1.0
     m_i = 1.0  # For real data, we don't have I so we use 1.0
     m_d = float(np.nanmax(r)) if np.nanmax(r) > 0 else 1.0
-    
+
     time_norm = t_min / m_t if m_t > 0 else t_min
-    
+
     return {
         "patient_label": patient_label,
         "time_index": time_index,
@@ -95,6 +105,7 @@ def _assemble_window_dict(
         "meta": meta,
     }
 
+
 def select_window_manual(
     df_cgm: pd.DataFrame,
     df_events: pd.DataFrame,
@@ -109,7 +120,7 @@ def select_window_manual(
     pol = _CoveragePolicy(max_gap_min=max_gap_min, min_coverage=min_coverage)
 
     cgm = _standardize_cgm(df_cgm)
-    ev  = _standardize_events(df_events)
+    ev = _standardize_events(df_events)
 
     # 1) Upsample CGM to 1-min grid over the requested span
     t0 = pd.to_datetime(start_ts)
@@ -121,11 +132,18 @@ def select_window_manual(
     if cgm_range.empty:
         raise ValueError("No CGM in requested interval.")
 
-    cgm_1min = upsample_glucose_to_min(cgm_range[["timestamp","glucose"]])
-    minute_index = pd.date_range(cgm_1min["timestamp"].min(), cgm_1min["timestamp"].max(), freq="1min")
+    cgm_1min = upsample_glucose_to_min(cgm_range[["timestamp", "glucose"]])
+    minute_index = pd.date_range(
+        cgm_1min["timestamp"].min(), cgm_1min["timestamp"].max(), freq="1min"
+    )
     # ensure full closed interval at 1 min
-    cgm_1min = cgm_1min.set_index("timestamp").reindex(minute_index).rename_axis("timestamp").reset_index()
-    cgm_1min = cgm_1min.rename(columns={"index":"timestamp"})
+    cgm_1min = (
+        cgm_1min.set_index("timestamp")
+        .reindex(minute_index)
+        .rename_axis("timestamp")
+        .reset_index()
+    )
+    cgm_1min = cgm_1min.rename(columns={"index": "timestamp"})
     covered = cgm_1min["glucose"].notna().to_numpy()
 
     coverage = covered.mean()
@@ -159,9 +177,10 @@ def select_window_manual(
         r=ur["r"].to_numpy(dtype=np.float32),
         patient_label=patient_label,
         dt_minutes=dt_minutes,
-        meta={"mode": "manual", "start_ts": str(t0), "end_ts": str(t1)}
+        meta={"mode": "manual", "start_ts": str(t0), "end_ts": str(t1)},
     )
     return win
+
 
 def select_windows_auto(
     df_cgm: pd.DataFrame,
@@ -176,10 +195,10 @@ def select_windows_auto(
     """Find contiguous CGM blocks, then carve fixed-length windows and build aligned u/r."""
     pol = _CoveragePolicy(max_gap_min=max_gap_min, min_coverage=min_coverage)
     cgm = _standardize_cgm(df_cgm)
-    ev  = _standardize_events(df_events)
+    ev = _standardize_events(df_events)
 
     # 1) Get 1-min CGM over the full patient span
-    cgm_1min = upsample_glucose_to_min(cgm[["timestamp","glucose"]])
+    cgm_1min = upsample_glucose_to_min(cgm[["timestamp", "glucose"]])
     cgm_1min = cgm_1min.set_index("timestamp").sort_index()
 
     # regularize to 1-min integer grid across the full span
@@ -208,7 +227,10 @@ def select_windows_auto(
                 continue
 
             cgm_seg = cgm_1min.iloc[rng]
-            ev_seg  = ev[(ev["timestamp"] >= minute_index[0]) & (ev["timestamp"] <= minute_index[-1])].copy()
+            ev_seg = ev[
+                (ev["timestamp"] >= minute_index[0])
+                & (ev["timestamp"] <= minute_index[-1])
+            ].copy()
 
             # Build u(t), r(t) over this window using the canonical event logic
             ur_full = project_events_to_grid(
@@ -227,7 +249,7 @@ def select_windows_auto(
                 r=ur["r"].to_numpy(dtype=np.float32),
                 patient_label=patient_label,
                 dt_minutes=dt_minutes,
-                meta={"mode": "auto", "hours": hours}
+                meta={"mode": "auto", "hours": hours},
             )
             out.append(win)
 

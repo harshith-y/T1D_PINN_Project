@@ -27,11 +27,11 @@ import numpy as np
 def compute_derivative(y: np.ndarray, dt: float = 1.0) -> np.ndarray:
     """
     Compute numerical derivative using forward differences.
-    
+
     Args:
         y: Array of values
         dt: Time step (default 1 minute)
-    
+
     Returns:
         Derivative array (same length, last value repeated)
     """
@@ -41,14 +41,14 @@ def compute_derivative(y: np.ndarray, dt: float = 1.0) -> np.ndarray:
     return dy
 
 
-def interpolate_glucose(glucose: pd.Series, method: str = 'linear') -> pd.Series:
+def interpolate_glucose(glucose: pd.Series, method: str = "linear") -> pd.Series:
     """
     Interpolate missing glucose values.
-    
+
     Args:
         glucose: Series with glucose values (may have NaNs)
         method: Interpolation method ('linear', 'cubic', 'nearest')
-    
+
     Returns:
         Interpolated glucose series
     """
@@ -57,7 +57,7 @@ def interpolate_glucose(glucose: pd.Series, method: str = 'linear') -> pd.Series
     # Backward fill for trailing NaNs
     glucose = glucose.bfill()  # Updated: replaced fillna(method='bfill')
     # Interpolate remaining gaps
-    glucose = glucose.interpolate(method=method, limit_direction='both')
+    glucose = glucose.interpolate(method=method, limit_direction="both")
     return glucose
 
 
@@ -66,85 +66,91 @@ def prepare_patient_data(
     output_file: Path,
     patient_label: str,
     interpolate: bool = True,
-    verbose: bool = True
+    verbose: bool = True,
 ) -> bool:
     """
     Convert wide-format patient data to final training schema.
-    
+
     Args:
         input_file: Path to patient_*_wide.csv
         output_file: Path to save prepared CSV
         patient_label: Patient identifier (e.g., "RealPat1")
         interpolate: Whether to interpolate missing glucose values
         verbose: Print progress
-    
+
     Returns:
         True if successful, False otherwise
     """
     if verbose:
         print(f"  Processing: {input_file.name} → {patient_label}")
-    
+
     try:
         # Load wide-format data
         df = pd.read_csv(input_file)
-        
+
         # Check required columns
-        required = ['time_min', 'ut', 'rt', 'glucose']
+        required = ["time_min", "ut", "rt", "glucose"]
         missing = [col for col in required if col not in df.columns]
         if missing:
             print(f"    ❌ Missing columns: {missing}")
             return False
-        
+
         # Reset time to start at 0
-        df['time'] = df['time_min'] - df['time_min'].min()
-        
+        df["time"] = df["time_min"] - df["time_min"].min()
+
         # Handle glucose interpolation
         if interpolate:
-            n_missing_before = df['glucose'].isna().sum()
-            df['glucose'] = interpolate_glucose(df['glucose'])
-            n_missing_after = df['glucose'].isna().sum()
+            n_missing_before = df["glucose"].isna().sum()
+            df["glucose"] = interpolate_glucose(df["glucose"])
+            n_missing_after = df["glucose"].isna().sum()
             if verbose and n_missing_before > 0:
-                print(f"    Interpolated {n_missing_before} missing glucose values → {n_missing_after} remaining")
-        
+                print(
+                    f"    Interpolated {n_missing_before} missing glucose values → {n_missing_after} remaining"
+                )
+
         # Compute glucose derivative
-        df['glucose_derivative'] = compute_derivative(df['glucose'].values)
-        
+        df["glucose_derivative"] = compute_derivative(df["glucose"].values)
+
         # For real data, we don't have true I(t) and D(t) states
         # We'll set them to NaN - the model will need to handle this
         # OR we could simulate them using the Magdelaine model (future enhancement)
-        df['insulin'] = np.nan
-        df['insulin_derivative'] = np.nan
-        df['carbohydrates'] = np.nan
-        
+        df["insulin"] = np.nan
+        df["insulin_derivative"] = np.nan
+        df["carbohydrates"] = np.nan
+
         # Rename columns to match synthetic data schema
-        df['patient'] = patient_label
-        df['u'] = df['ut']  # Total insulin input (U/min)
-        df['r'] = df['rt']   # Carb input (g/min) - matches synthetic data
-        
+        df["patient"] = patient_label
+        df["u"] = df["ut"]  # Total insulin input (U/min)
+        df["r"] = df["rt"]  # Carb input (g/min) - matches synthetic data
+
         # Select and order columns to match synthetic schema
-        output_df = df[[
-            'time', 
-            'patient', 
-            'glucose', 
-            'glucose_derivative',
-            'insulin',  # NaN for real data (or simulated)
-            'insulin_derivative',  # NaN for real data
-            'carbohydrates',  # NaN for real data (or simulated)
-            'u',
-            'r'
-        ]]
-        
+        output_df = df[
+            [
+                "time",
+                "patient",
+                "glucose",
+                "glucose_derivative",
+                "insulin",  # NaN for real data (or simulated)
+                "insulin_derivative",  # NaN for real data
+                "carbohydrates",  # NaN for real data (or simulated)
+                "u",
+                "r",
+            ]
+        ]
+
         # Save to file
         output_file.parent.mkdir(parents=True, exist_ok=True)
         output_df.to_csv(output_file, index=False)
-        
+
         if verbose:
-            duration_hours = output_df['time'].max() / 60
-            n_glucose = output_df['glucose'].notna().sum()
-            print(f"    ✓ Duration: {duration_hours:.1f}h, Glucose readings: {n_glucose}")
-        
+            duration_hours = output_df["time"].max() / 60
+            n_glucose = output_df["glucose"].notna().sum()
+            print(
+                f"    ✓ Duration: {duration_hours:.1f}h, Glucose readings: {n_glucose}"
+            )
+
         return True
-        
+
     except Exception as e:
         print(f"    ❌ Error: {e}")
         return False
@@ -155,79 +161,77 @@ def main():
         description="Prepare real patient data for training"
     )
     parser.add_argument(
-        '--input_dir',
+        "--input_dir",
         type=str,
-        default='data/real',
-        help='Directory with patient_*_wide.csv files'
+        default="data/real",
+        help="Directory with patient_*_wide.csv files",
     )
     parser.add_argument(
-        '--output_dir',
+        "--output_dir",
         type=str,
-        default='data/processed',
-        help='Directory to save prepared CSV files'
+        default="data/processed",
+        help="Directory to save prepared CSV files",
     )
     parser.add_argument(
-        '--no_interpolate',
-        action='store_true',
-        help='Skip glucose interpolation (keep NaNs)'
+        "--no_interpolate",
+        action="store_true",
+        help="Skip glucose interpolation (keep NaNs)",
     )
     parser.add_argument(
-        '--verbose',
-        action='store_true',
-        help='Print detailed progress'
+        "--verbose", action="store_true", help="Print detailed progress"
     )
-    
+
     args = parser.parse_args()
-    
+
     input_dir = Path(args.input_dir)
     output_dir = Path(args.output_dir)
-    
+
     print("=" * 80)
     print("PREPARING REAL PATIENT DATA FOR TRAINING")
     print("=" * 80)
     print(f"Input directory: {input_dir}")
     print(f"Output directory: {output_dir}")
     print(f"Interpolate glucose: {not args.no_interpolate}")
-    
+
     # Find all wide-format files
     wide_files = sorted(input_dir.glob("patient_*_wide.csv"))
-    
+
     if not wide_files:
         print(f"\n❌ No patient files found in {input_dir}")
         print("   Expected files matching pattern: patient_*_wide.csv")
         print("   Run extract_real_data.py first!")
         return
-    
+
     print(f"\nFound {len(wide_files)} patient files")
-    
+
     # Process each patient
     print("\nProcessing patients...")
     success_count = 0
-    
+
     for i, input_file in enumerate(wide_files, 1):
         # Generate patient label: RealPat1, RealPat2, etc.
         patient_label = f"RealPat{i}"
         output_file = output_dir / f"{patient_label}.csv"
-        
+
         print(f"\n[{i}/{len(wide_files)}] {patient_label}")
-        
+
         success = prepare_patient_data(
             input_file=input_file,
             output_file=output_file,
             patient_label=patient_label,
             interpolate=not args.no_interpolate,
-            verbose=args.verbose
+            verbose=args.verbose,
         )
-        
+
         if success:
             success_count += 1
-    
+
     # Summary
     print("\n" + "=" * 80)
     print("SUMMARY")
     print("=" * 80)
     print(f"Successfully prepared: {success_count}/{len(wide_files)} patients")
-    
+
     if success_count > 0:
         print(f"✅ Output files saved to: {output_dir}")
         print("\nData schema:")
