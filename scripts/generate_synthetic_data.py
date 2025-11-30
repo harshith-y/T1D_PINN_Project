@@ -13,15 +13,15 @@ Or with custom output directory:
     python scripts/regenerate_synthetic_data.py --out_dir data/synthetic
 """
 
+import argparse
 import sys
 from pathlib import Path
-import argparse
 
 # Add project root to path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.datasets.simulator import simulate, write_csv, SimConfig
+from src.datasets.simulator import SimConfig, simulate, write_csv
 from src.physics.magdelaine import make_params_from_preset
 
 

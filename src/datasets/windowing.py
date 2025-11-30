@@ -1,14 +1,13 @@
 # src/datasets/windowing.py
 from __future__ import annotations
-from dataclasses import dataclass
-from typing import Optional, List, Dict, Any
-import pandas as pd
-import numpy as np
 
-from .preprocessing import (
-    upsample_glucose_to_min,
-    project_events_to_grid,
-)
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
+
+import numpy as np
+import pandas as pd
+
+from .preprocessing import project_events_to_grid, upsample_glucose_to_min
 
 
 @dataclass

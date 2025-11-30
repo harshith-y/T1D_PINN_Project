@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
-from typing import Optional, Literal
+from pathlib import Path
+from typing import Literal, Optional
+
 import numpy as np
 import pandas as pd
-import json
-from pathlib import Path
 
 
 @dataclass

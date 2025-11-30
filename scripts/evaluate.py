@@ -26,11 +26,13 @@ project_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(project_root))
 
 import argparse
-import pandas as pd
 from glob import glob
 
+import pandas as pd
+
+from src.evaluation.metrics import (compute_glucose_metrics,
+                                    compute_latent_metrics)
 from src.training.predictions import PredictionManager
-from src.evaluation.metrics import compute_glucose_metrics, compute_latent_metrics
 
 
 def evaluate_single(results_dir: Path, k_step: int = None) -> dict:

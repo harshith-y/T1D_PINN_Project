@@ -17,11 +17,13 @@ Usage:
 """
 
 from __future__ import annotations
+
 import argparse
 from pathlib import Path
 from typing import Dict, List, Optional
-import pandas as pd
+
 import numpy as np
+import pandas as pd
 
 
 def compute_derivative(y: np.ndarray, dt: float = 1.0) -> np.ndarray:

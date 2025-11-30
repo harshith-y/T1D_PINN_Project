@@ -23,6 +23,7 @@ tf.compat.v1.disable_v2_behavior()
 tf.compat.v1.disable_eager_execution()
 
 import numpy as np
+
 from src.datasets.loader import load_synthetic_window
 from src.models.pinn_feedforward import FeedforwardPINN
 from src.training.config import load_config

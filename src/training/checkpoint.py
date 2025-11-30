@@ -11,9 +11,11 @@ Provides CheckpointManager class that handles:
 """
 
 from __future__ import annotations
-from pathlib import Path
-from typing import Dict, Any, Optional, List
+
 import json
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
 import numpy as np
 import tensorflow as tf
 

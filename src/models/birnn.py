@@ -13,8 +13,10 @@ Key differences from PINN models:
 """
 
 from __future__ import annotations
-from typing import Dict, List, Optional, Tuple
+
 from pathlib import Path
+from typing import Dict, List, Optional, Tuple
+
 import numpy as np
 import tensorflow as tf
 
@@ -25,14 +27,11 @@ if not tf.executing_eagerly():
 
 # Phase 1 imports
 from src.datasets.loader import TrainingWindow
-from src.physics.magdelaine import (
-    MagdelaineParams,
-    make_params_from_preset,
-    make_inverse_params,
-    get_param_value,
-    simulate_latents_euler,
-    residuals_euler_seq,
-)
+from src.physics.magdelaine import (MagdelaineParams, get_param_value,
+                                    make_inverse_params,
+                                    make_params_from_preset,
+                                    residuals_euler_seq,
+                                    simulate_latents_euler)
 
 
 class GRUDeCarliModel(tf.keras.Model):

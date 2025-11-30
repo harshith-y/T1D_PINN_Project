@@ -12,7 +12,9 @@ Based on the working 3-stage pattern from test_birnn_inverse_training.py
 """
 
 from __future__ import annotations
-from typing import Dict, List, Any, Optional
+
+from typing import Any, Dict, List, Optional
+
 import numpy as np
 import tensorflow as tf
 

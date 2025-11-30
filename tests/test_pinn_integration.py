@@ -8,10 +8,11 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.training.config import load_config  # ← YOUR path
+import numpy as np
+
 from src.datasets.loader import load_synthetic_window
 from src.models.pinn_feedforward import FeedforwardPINN
-import numpy as np
+from src.training.config import load_config  # ← YOUR path
 
 
 def test_pinn_integration():

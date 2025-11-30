@@ -33,11 +33,12 @@ import tensorflow as tf
 tf.compat.v1.disable_v2_behavior()
 tf.compat.v1.disable_eager_execution()
 
-import numpy as np
 import argparse
 from datetime import datetime
 
-from src.datasets.loader import load_synthetic_window, load_real_patient_csv
+import numpy as np
+
+from src.datasets.loader import load_real_patient_csv, load_synthetic_window
 from src.training.config import load_config
 from src.visualisation.plotter import ExperimentPlotter
 

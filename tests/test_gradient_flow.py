@@ -11,8 +11,9 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-import tensorflow as tf
 import numpy as np
+import tensorflow as tf
+
 from src.datasets.loader import load_synthetic_window
 from src.models.birnn import BIRNN
 from src.training.config import load_config
@@ -93,8 +94,9 @@ with tf.GradientTape() as tape:
     R_seq = tf.squeeze(model.R_train, axis=0) * model.r_max
 
     # Use log_ksi in physics
-    from src.physics.magdelaine import residuals_euler_seq
     import copy
+
+    from src.physics.magdelaine import residuals_euler_seq
 
     temp_params = copy.copy(model.params)
     temp_params.ksi = tf.exp(model.log_ksi)  # ← Use trainable parameter

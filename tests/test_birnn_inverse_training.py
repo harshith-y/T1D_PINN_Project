@@ -18,6 +18,7 @@ sys.path.insert(0, str(project_root))
 
 import numpy as np
 import tensorflow as tf
+
 from src.datasets.loader import load_synthetic_window
 from src.models.birnn import BIRNN
 from src.training.config import load_config

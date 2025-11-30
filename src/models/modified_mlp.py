@@ -22,21 +22,17 @@ if tf.executing_eagerly():
     tf.compat.v1.disable_v2_behavior()
     tf.compat.v1.disable_eager_execution()
 
-from typing import Dict, List, Optional, Any
 from pathlib import Path
-import numpy as np
+from typing import Any, Dict, List, Optional
+
 import deepxde as dde
+import numpy as np
 
 # Phase 1 imports
 from src.datasets.loader import TrainingWindow
-from src.physics.magdelaine import (
-    MagdelaineParams,
-    InverseParams,
-    make_params_from_preset,
-    make_inverse_params,
-    get_param_value,
-    residuals_dde,
-)
+from src.physics.magdelaine import (InverseParams, MagdelaineParams,
+                                    get_param_value, make_inverse_params,
+                                    make_params_from_preset, residuals_dde)
 
 
 class ModifiedMLP(dde.nn.NN):

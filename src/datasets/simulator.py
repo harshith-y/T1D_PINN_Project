@@ -1,17 +1,17 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional
-import json
+from typing import Dict, List, Optional, Tuple
+
 import numpy as np
 import pandas as pd
 
 # Reuse your physics for params (no duplication)
-from src.physics.magdelaine import (
-    MagdelaineParams,
-    make_params_from_preset,  # optional for CLI convenience
-)
+from src.physics.magdelaine import \
+    make_params_from_preset  # optional for CLI convenience
+from src.physics.magdelaine import MagdelaineParams
 
 # --------------------------------------------------------------------------------------
 # Patient-specific presets (from your simulator notebook)

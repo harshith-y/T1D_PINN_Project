@@ -31,12 +31,12 @@ tf.compat.v1.disable_eager_execution()
 import argparse
 from datetime import datetime
 
-from src.datasets.loader import load_synthetic_window, load_real_patient_csv
-from src.training.config import Config
-from src.training.checkpoint import CheckpointManager
-from src.training.predictions import PredictionManager
-from src.training.inverse_trainer import InverseTrainer
+from src.datasets.loader import load_real_patient_csv, load_synthetic_window
 from src.physics.magdelaine import make_params_from_preset
+from src.training.checkpoint import CheckpointManager
+from src.training.config import Config
+from src.training.inverse_trainer import InverseTrainer
+from src.training.predictions import PredictionManager
 
 
 def load_model(model_name: str, config):

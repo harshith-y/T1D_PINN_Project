@@ -8,10 +8,11 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.training.config import load_config
+import numpy as np
+
 from src.datasets.loader import load_synthetic_window
 from src.models.modified_mlp import ModifiedMLPPINN
-import numpy as np
+from src.training.config import load_config
 
 
 def test_modified_mlp_integration():

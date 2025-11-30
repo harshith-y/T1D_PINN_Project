@@ -16,12 +16,14 @@ Usage:
 """
 
 from __future__ import annotations
+
 import argparse
 import os
 from pathlib import Path
 from typing import List
-import pandas as pd
+
 import numpy as np
+import pandas as pd
 
 
 def extract_patient_data(

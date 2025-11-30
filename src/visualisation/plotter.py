@@ -13,13 +13,15 @@ Usage:
 """
 
 from __future__ import annotations
+
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Any
-import numpy as np
+from typing import Any, Dict, List, Optional, Tuple
+
 import matplotlib.pyplot as plt
-import seaborn as sns
+import numpy as np
 import pandas as pd
+import seaborn as sns
 
 # Set consistent style
 sns.set(style="whitegrid")

@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, Dict
+from typing import Dict, Optional
 
+import deepxde as dde
 import numpy as np
 import tensorflow as tf
-import deepxde as dde
-
 
 # --------------------------------------------------------------------------------------
 # Patient presets (from your notebooks). kb is treated as a first-class parameter.

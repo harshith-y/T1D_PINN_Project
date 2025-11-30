@@ -14,19 +14,20 @@ Supports:
 """
 
 from __future__ import annotations
-from typing import Dict, List, Optional, Any, TYPE_CHECKING
-from pathlib import Path
-from dataclasses import dataclass
-import time
+
 import json
+import time
+from dataclasses import dataclass
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import numpy as np
 import tensorflow as tf
 
 if TYPE_CHECKING:
-    from src.models.pinn_feedforward import FeedforwardPINN
-    from src.models.modified_mlp import ModifiedMLPPINN
     from src.models.birnn import BIRNN
+    from src.models.modified_mlp import ModifiedMLPPINN
+    from src.models.pinn_feedforward import FeedforwardPINN
 
 
 @dataclass

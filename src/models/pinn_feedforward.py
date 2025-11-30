@@ -33,24 +33,21 @@ if tf.executing_eagerly():
     tf.compat.v1.disable_v2_behavior()
     tf.compat.v1.disable_eager_execution()
 
-from typing import Optional, Dict, Any, List
-import numpy as np
-import deepxde as dde
-from pathlib import Path
 import sys
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+import deepxde as dde
+import numpy as np
 
 # Add project root to path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.physics.magdelaine import (
-    MagdelaineParams,
-    make_params_from_preset,
-    make_inverse_params,
-    get_param_value,
-    residuals_dde,
-)
 from src.datasets.loader import TrainingWindow
+from src.physics.magdelaine import (MagdelaineParams, get_param_value,
+                                    make_inverse_params,
+                                    make_params_from_preset, residuals_dde)
 
 
 class InputLookup:
@@ -511,15 +508,15 @@ class FeedforwardPINN:
 
 # Example usage / Quick test
 if __name__ == "__main__":
-    from pathlib import Path
     import sys
+    from pathlib import Path
 
     # Add project root to path
     project_root = Path(__file__).parent.parent
     sys.path.insert(0, str(project_root))
 
-    from src.training.config import load_config
     from src.datasets.loader import load_synthetic_window
+    from src.training.config import load_config
 
     # Load config
     config = load_config(model_name="pinn", mode="forward")

@@ -15,6 +15,7 @@ Run with: python tests/test_data_loading.py
 
 import sys
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
@@ -22,8 +23,8 @@ import pandas as pd
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.datasets.simulator import simulate, write_csv, SimConfig
-from src.datasets.loader import load_synthetic_window, TrainingWindow
+from src.datasets.loader import TrainingWindow, load_synthetic_window
+from src.datasets.simulator import SimConfig, simulate, write_csv
 from src.physics.magdelaine import make_params_from_preset
 
 

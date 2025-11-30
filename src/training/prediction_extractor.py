@@ -6,7 +6,9 @@ Extracted from train_with_visual.py for reusability.
 """
 
 from __future__ import annotations
-from typing import Dict, Any, Optional
+
+from typing import Any, Dict, Optional
+
 import numpy as np
 import tensorflow as tf
 
