@@ -1,0 +1,4 @@
+# Add patterns of files dvc should ignore
+*.pyc
+__pycache__
+.git

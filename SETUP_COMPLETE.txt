@@ -1,0 +1,14 @@
+========================================
+T1D PINN Setup Checklist
+========================================
+
+□ Directory structure created
+□ Configuration files created (.gitignore, .dockerignore, etc.)
+□ Downloaded all files from Claude
+□ Placed files in correct directories
+□ Edited terraform/terraform.tfvars
+□ Created AWS SSH key pair
+□ Committed to git
+
+Next: docker-compose build
+========================================

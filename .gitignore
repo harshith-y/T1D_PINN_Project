@@ -4,60 +4,80 @@ __pycache__/
 *$py.class
 *.so
 .Python
-*.egg-info/
-dist/
 build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
 *.egg
-.pytest_cache/
-.coverage
-htmlcov/
+MANIFEST
 
 # Virtual environments
-T1D_PINN_venv/
 venv/
-env/
 ENV/
+env/
 
-# Jupyter Notebooks
-.ipynb_checkpoints/
-*.ipynb_checkpoints
-
-# Data (too large for GitHub)
-data/raw/*.csv
-data/real/*.csv
-data/processed/*.csv
-data/synthetic/*.csv
-
-# Keep directory structure but not data files
-!data/.gitkeep
-!data/raw/.gitkeep
-!data/real/.gitkeep
-!data/processed/.gitkeep
-!data/synthetic/.gitkeep
-
-# Model outputs
-runs/
-checkpoints/
-*.h5
-*.ckpt
-*.pth
-
-# Logs
-*.log
-logs/
-*.out
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 
 # OS
 .DS_Store
 Thumbs.db
 
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
+# Project specific
+results/
+mlruns/
+mlflow-artifacts/
+data/synthetic/*.csv
+data/processed/*.csv
+*.npz
+*.ckpt
 
-# Temporary files
-tmp/
-temp/
-*.tmp
+# DVC
+/data/synthetic
+/data/processed
+.dvc/tmp
+.dvc/cache
+
+# Terraform
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.backup
+terraform/.terraform.lock.hcl
+
+# Docker
+*.log
+
+# Secrets
+*.pem
+*.key
+.env
+secrets/
+
+# ============================================
+# CRITICAL: Confidential Patient Data
+# ============================================
+# Real patient data - NEVER commit these!
+data/real/
+data/raw/
+data/raw/*.csv
+**/patient_*.csv
+**/*_patient_*.csv
+*.csv
+
+# Jupyter notebooks (may contain outputs with patient data)
+.ipynb_checkpoints/
+*-checkpoint.ipynb
