@@ -30,9 +30,14 @@ import numpy as np
 
 # Phase 1 imports
 from src.datasets.loader import TrainingWindow
-from src.physics.magdelaine import (InverseParams, MagdelaineParams,
-                                    get_param_value, make_inverse_params,
-                                    make_params_from_preset, residuals_dde)
+from src.physics.magdelaine import (
+    InverseParams,
+    MagdelaineParams,
+    get_param_value,
+    make_inverse_params,
+    make_params_from_preset,
+    residuals_dde,
+)
 
 
 class ModifiedMLP(dde.nn.NN):

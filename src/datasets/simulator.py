@@ -9,8 +9,9 @@ import numpy as np
 import pandas as pd
 
 # Reuse your physics for params (no duplication)
-from src.physics.magdelaine import \
-    make_params_from_preset  # optional for CLI convenience
+from src.physics.magdelaine import (
+    make_params_from_preset,
+)  # optional for CLI convenience
 from src.physics.magdelaine import MagdelaineParams
 
 # --------------------------------------------------------------------------------------

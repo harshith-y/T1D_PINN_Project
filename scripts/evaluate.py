@@ -30,8 +30,7 @@ from glob import glob
 
 import pandas as pd
 
-from src.evaluation.metrics import (compute_glucose_metrics,
-                                    compute_latent_metrics)
+from src.evaluation.metrics import compute_glucose_metrics, compute_latent_metrics
 from src.training.predictions import PredictionManager
 
 

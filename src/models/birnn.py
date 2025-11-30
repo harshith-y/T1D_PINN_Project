@@ -27,11 +27,14 @@ if not tf.executing_eagerly():
 
 # Phase 1 imports
 from src.datasets.loader import TrainingWindow
-from src.physics.magdelaine import (MagdelaineParams, get_param_value,
-                                    make_inverse_params,
-                                    make_params_from_preset,
-                                    residuals_euler_seq,
-                                    simulate_latents_euler)
+from src.physics.magdelaine import (
+    MagdelaineParams,
+    get_param_value,
+    make_inverse_params,
+    make_params_from_preset,
+    residuals_euler_seq,
+    simulate_latents_euler,
+)
 
 
 class GRUDeCarliModel(tf.keras.Model):

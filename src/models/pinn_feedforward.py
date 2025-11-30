@@ -45,9 +45,13 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from src.datasets.loader import TrainingWindow
-from src.physics.magdelaine import (MagdelaineParams, get_param_value,
-                                    make_inverse_params,
-                                    make_params_from_preset, residuals_dde)
+from src.physics.magdelaine import (
+    MagdelaineParams,
+    get_param_value,
+    make_inverse_params,
+    make_params_from_preset,
+    residuals_dde,
+)
 
 
 class InputLookup:
