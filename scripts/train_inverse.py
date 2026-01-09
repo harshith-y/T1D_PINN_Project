@@ -157,9 +157,7 @@ def main():
         data = load_synthetic_window(patient=args.patient, root="data/synthetic")
 
         if not data.has_latent_states:
-            print(
-                "❌ Error: Inverse training requires synthetic data with ground truth"
-            )
+            print("❌ Error: Inverse training requires synthetic data with ground truth")
             sys.exit(1)
 
         # Get true parameter value (for error calculation)

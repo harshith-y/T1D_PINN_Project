@@ -43,17 +43,14 @@ jobs:
       
       - name: Check code formatting with Black
         run: black --check --diff src/ scripts/ tests/
-        continue-on-error: true
-      
+
       - name: Check import sorting with isort
         run: isort --check-only --diff src/ scripts/ tests/
-        continue-on-error: true
-      
+
       - name: Lint with flake8
         run: |
           flake8 src/ scripts/ tests/ --count --select=E9,F63,F7,F82 --show-source --statistics
           flake8 src/ scripts/ tests/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-        continue-on-error: true
 
   # ===========================================================================
   # Unit Tests
@@ -89,13 +86,10 @@ jobs:
           python -m pip install --upgrade pip setuptools wheel
           pip install pytest pytest-cov
           pip install -e .
-        continue-on-error: true
-      
+
       - name: Run unit tests
-        run: |
-          pytest tests/unit/ -v || echo "Tests completed with issues"
-        continue-on-error: true
-      
+        run: pytest tests/unit/ -v
+
       - name: Upload test results
         uses: actions/upload-artifact@v4
         if: always()

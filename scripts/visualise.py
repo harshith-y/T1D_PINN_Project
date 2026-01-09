@@ -162,9 +162,7 @@ def main():
         if param_plots_generated == 0:
             print("   ⚠️  No parameter evolution data found")
         else:
-            print(
-                f"   ✅ Generated {param_plots_generated} parameter evolution plot(s)"
-            )
+            print(f"   ✅ Generated {param_plots_generated} parameter evolution plot(s)")
 
     # ========================================================================
     # FINAL SUMMARY

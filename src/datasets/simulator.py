@@ -9,10 +9,10 @@ import numpy as np
 import pandas as pd
 
 # Reuse your physics for params (no duplication)
-from src.physics.magdelaine import (
+from src.physics.magdelaine import (  # optional for CLI convenience
+    MagdelaineParams,
     make_params_from_preset,
-)  # optional for CLI convenience
-from src.physics.magdelaine import MagdelaineParams
+)
 
 # --------------------------------------------------------------------------------------
 # Patient-specific presets (from your simulator notebook)
