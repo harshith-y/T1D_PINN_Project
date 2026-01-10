@@ -22,24 +22,24 @@ variable "owner_email" {
 }
 
 variable "instance_type" {
-  description = "EC2 instance type (t3.medium for CPU, g4dn.xlarge for GPU)"
+  description = "EC2 instance type (t3.micro for budget, t3.medium for CPU, g4dn.xlarge for GPU)"
   type        = string
-  default     = "t3.medium"
-  
+  default     = "t3.micro"
+
   validation {
-    condition     = can(regex("^(t3\\.|g4dn\\.|p3\\.|p4d\\.)", var.instance_type))
-    error_message = "Instance type must be t3.*, g4dn.*, p3.*, or p4d.*"
+    condition     = can(regex("^(t2\\.|t3\\.|g4dn\\.|p3\\.|p4d\\.)", var.instance_type))
+    error_message = "Instance type must be t2.*, t3.*, g4dn.*, p3.*, or p4d.*"
   }
 }
 
 variable "root_volume_size" {
   description = "Size of root EBS volume in GB"
   type        = number
-  default     = 100
-  
+  default     = 30
+
   validation {
-    condition     = var.root_volume_size >= 50 && var.root_volume_size <= 500
-    error_message = "Root volume size must be between 50 and 500 GB"
+    condition     = var.root_volume_size >= 20 && var.root_volume_size <= 500
+    error_message = "Root volume size must be between 20 and 500 GB"
   }
 }
 

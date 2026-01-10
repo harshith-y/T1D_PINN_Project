@@ -18,6 +18,7 @@ setup(
         "scikit-learn>=1.3,<1.6",
         "optuna>=3.5,<4",
         "tqdm>=4.66,<5",
+        "mlflow>=2.10,<3",
     ],
     extras_require={
         "dev": [
