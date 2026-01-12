@@ -29,30 +29,30 @@ training:
   
   stages:
     - name: stage1_params_only
-      epochs: 500
+      epochs: 5000
       learning_rate: 1.0e-3
       # CRITICAL: Must include ODE losses for physics guidance!
-      loss_weights: [3.32, 5.97, 4.70, 2.71]
+      loss_weights: [1, 0, 0, 0]
       train_inverse_params: true
       train_nn_weights: false
       optimizer: adam
       display_every: 500
     
     - name: stage2_nn_only
-      epochs: 800
+      epochs: 3000
       learning_rate: 5.0e-4
       # Same physics losses
-      loss_weights: [3.32, 5.97, 4.70, 2.71]
+      loss_weights: [5.97, 4.70, 2.71, 3.32]
       train_inverse_params: false
       train_nn_weights: true
       optimizer: adam
       display_every: 500
     
     - name: stage3_joint
-      epochs: 200
+      epochs: 2000
       learning_rate: 2.0e-4
       # Same physics losses
-      loss_weights: [3.32, 5.97, 4.70, 2.71]
+      loss_weights: [5.97, 4.70, 2.71, 3.32]
       train_inverse_params: true
       train_nn_weights: true
       optimizer: adam

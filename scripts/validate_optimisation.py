@@ -81,12 +81,14 @@ def get_top_configs(study: optuna.Study, top_k: int = 3) -> List[Dict]:
     for model_type, trials in model_trials.items():
         sorted_trials = sorted(trials, key=lambda t: t.value)[:top_k]
         for trial in sorted_trials:
-            top_configs.append({
-                "model_type": model_type,
-                "trial_number": trial.number,
-                "search_value": trial.value,
-                "params": trial.params.copy(),
-            })
+            top_configs.append(
+                {
+                    "model_type": model_type,
+                    "trial_number": trial.number,
+                    "search_value": trial.value,
+                    "params": trial.params.copy(),
+                }
+            )
 
     return top_configs
 
@@ -144,12 +146,15 @@ def run_validation(
         # Build model
         if model_type == "birnn":
             from src.models.birnn import BIRNN
+
             model = BIRNN(cfg)
         elif model_type == "pinn":
             from src.models.pinn_feedforward import FeedforwardPINN
+
             model = FeedforwardPINN(cfg)
         elif model_type == "modified_mlp":
             from src.models.modified_mlp import ModifiedMLPPINN
+
             model = ModifiedMLPPINN(cfg)
         else:
             raise ValueError(f"Unknown model: {model_type}")
@@ -222,7 +227,9 @@ def validate_configs(
     for i, config in enumerate(configs):
         model_type = config["model_type"]
         print(f"\n{'='*60}")
-        print(f"Config {i+1}/{len(configs)}: {model_type.upper()} (trial {config['trial_number']})")
+        print(
+            f"Config {i+1}/{len(configs)}: {model_type.upper()} (trial {config['trial_number']})"
+        )
         print(f"Search value: {config['search_value']:.4f}")
         print(f"{'='*60}")
 
@@ -239,14 +246,16 @@ def validate_configs(
 
             config_results.append(value)
 
-            results.append({
-                "model_type": model_type,
-                "trial_number": config["trial_number"],
-                "search_value": config["search_value"],
-                "patient": patient,
-                "validation_value": value,
-                **{k: v for k, v in res.items() if k != "patient"},
-            })
+            results.append(
+                {
+                    "model_type": model_type,
+                    "trial_number": config["trial_number"],
+                    "search_value": config["search_value"],
+                    "patient": patient,
+                    "validation_value": value,
+                    **{k: v for k, v in res.items() if k != "patient"},
+                }
+            )
 
         # Summary for this config
         mean_val = np.mean(config_results)
@@ -267,9 +276,11 @@ def validate_configs(
 def generate_validation_report(df: pd.DataFrame, output_dir: Path, mode: str):
     """Generate validation summary report."""
     # Summary by model
-    summary = df.groupby("model_type")["validation_value"].agg([
-        "mean", "std", "min", "max", "count"
-    ]).round(4)
+    summary = (
+        df.groupby("model_type")["validation_value"]
+        .agg(["mean", "std", "min", "max", "count"])
+        .round(4)
+    )
 
     summary.columns = ["Mean", "Std", "Best", "Worst", "N"]
 

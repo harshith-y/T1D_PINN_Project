@@ -1,13 +1,18 @@
-version: '3.8'
-
 # =============================================================================
-# T1D PINN Production Stack
-# Multi-service orchestration for training, tracking, and orchestration
+# T1D PINN Docker Setup (Simplified)
+# Training container only - for reproducible builds and CV demonstration
+# =============================================================================
+#
+# NOTE: This is kept minimal. For actual training, we use EC2 + S3:
+#   - EC2 GPU instance for training
+#   - S3 bucket for results storage
+#   - No orchestration services needed for this research project
+#
 # =============================================================================
 
 services:
   # ===========================================================================
-  # Training Service - Main model training container
+  # Training Service - Containerized training environment
   # ===========================================================================
   training:
     build:
@@ -23,15 +28,13 @@ services:
       - ./src:/app/src:ro                  # Read-only source code
       - ./scripts:/app/scripts:ro          # Read-only scripts
     environment:
-      - MLFLOW_TRACKING_URI=http://mlflow:5000
       - PYTHONPATH=/app
       - TF_FORCE_GPU_ALLOW_GROWTH=true
       - CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}
-    networks:
-      - t1d-network
-    depends_on:
-      - mlflow
-    # For GPU support, uncomment:
+      # S3 upload settings (optional)
+      - T1D_S3_BUCKET=${T1D_S3_BUCKET:-}
+      - AWS_REGION=${AWS_REGION:-eu-west-2}
+    # For GPU support (requires nvidia-docker):
     # deploy:
     #   resources:
     #     reservations:
@@ -40,190 +43,20 @@ services:
     #           count: 1
     #           capabilities: [gpu]
 
-  # ===========================================================================
-  # MLflow Service - Experiment tracking and model registry
-  # ===========================================================================
-  mlflow:
-    image: ghcr.io/mlflow/mlflow:latest
-    container_name: t1d-mlflow
-    ports:
-      - "5000:5000"
-    volumes:
-      - ./mlruns:/mlflow/mlruns            # Experiment tracking data
-      - ./mlflow-artifacts:/mlflow/artifacts  # Model artifacts
-    environment:
-      - MLFLOW_BACKEND_STORE_URI=sqlite:////mlflow/mlruns/mlflow.db
-      - MLFLOW_DEFAULT_ARTIFACT_ROOT=/mlflow/artifacts
-    command: >
-      mlflow server
-      --backend-store-uri sqlite:////mlflow/mlruns/mlflow.db
-      --default-artifact-root /mlflow/artifacts
-      --host 0.0.0.0
-      --port 5000
-    networks:
-      - t1d-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
-
-  # ===========================================================================
-  # Airflow Services - Workflow orchestration
-  # ===========================================================================
-  
-  # Postgres database for Airflow metadata
-  postgres:
-    image: postgres:14-alpine
-    container_name: t1d-postgres
-    environment:
-      - POSTGRES_USER=airflow
-      - POSTGRES_PASSWORD=airflow
-      - POSTGRES_DB=airflow
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-    networks:
-      - t1d-network
-    healthcheck:
-      test: ["CMD", "pg_isready", "-U", "airflow"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # Airflow webserver
-  airflow-webserver:
-    image: apache/airflow:2.7.3-python3.9
-    container_name: t1d-airflow-webserver
-    command: webserver
-    ports:
-      - "8080:8080"
-    environment:
-      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
-      - AIRFLOW__CORE__FERNET_KEY=''
-      - AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=true
-      - AIRFLOW__CORE__LOAD_EXAMPLES=false
-      - AIRFLOW__API__AUTH_BACKENDS=airflow.api.auth.backend.basic_auth
-      - AIRFLOW__WEBSERVER__EXPOSE_CONFIG=true
-      - AIRFLOW__WEBSERVER__RBAC=true
-    volumes:
-      - ./airflow/dags:/opt/airflow/dags
-      - ./airflow/logs:/opt/airflow/logs
-      - ./airflow/plugins:/opt/airflow/plugins
-      - ./data:/data:ro
-      - ./results:/results:rw
-      - /var/run/docker.sock:/var/run/docker.sock  # For Docker operator
-    networks:
-      - t1d-network
-    depends_on:
-      - postgres
-      - airflow-init
-    healthcheck:
-      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-
-  # Airflow scheduler
-  airflow-scheduler:
-    image: apache/airflow:2.7.3-python3.9
-    container_name: t1d-airflow-scheduler
-    command: scheduler
-    environment:
-      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
-      - AIRFLOW__CORE__FERNET_KEY=''
-      - AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=true
-      - AIRFLOW__CORE__LOAD_EXAMPLES=false
-    volumes:
-      - ./airflow/dags:/opt/airflow/dags
-      - ./airflow/logs:/opt/airflow/logs
-      - ./airflow/plugins:/opt/airflow/plugins
-      - ./data:/data:ro
-      - ./results:/results:rw
-      - /var/run/docker.sock:/var/run/docker.sock
-    networks:
-      - t1d-network
-    depends_on:
-      - postgres
-      - airflow-init
-    healthcheck:
-      test: ["CMD-SHELL", 'airflow jobs check --job-type SchedulerJob --hostname "$${HOSTNAME}"']
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-
-  # Airflow initialization
-  airflow-init:
-    image: apache/airflow:2.7.3-python3.9
-    container_name: t1d-airflow-init
-    entrypoint: /bin/bash
-    command:
-      - -c
-      - |
-        mkdir -p /opt/airflow/logs /opt/airflow/dags /opt/airflow/plugins
-        airflow db init
-        airflow users create \
-          --username admin \
-          --firstname Admin \
-          --lastname User \
-          --role Admin \
-          --email admin@example.com \
-          --password admin
-    environment:
-      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
-      - AIRFLOW__CORE__FERNET_KEY=''
-      - AIRFLOW__CORE__LOAD_EXAMPLES=false
-    volumes:
-      - ./airflow/dags:/opt/airflow/dags
-      - ./airflow/logs:/opt/airflow/logs
-      - ./airflow/plugins:/opt/airflow/plugins
-    networks:
-      - t1d-network
-    depends_on:
-      - postgres
-
 # =============================================================================
-# Networks
+# Usage:
 # =============================================================================
-networks:
-  t1d-network:
-    driver: bridge
-    name: t1d-network
-
-# =============================================================================
-# Volumes
-# =============================================================================
-volumes:
-  postgres-data:
-    name: t1d-postgres-data
-
-# =============================================================================
-# Usage Examples:
-# =============================================================================
-# Build all services:
+# Build:
 #   docker-compose build
 #
-# Start all services:
-#   docker-compose up -d
-#
-# View logs:
-#   docker-compose logs -f [service-name]
-#
-# Stop all services:
-#   docker-compose down
-#
 # Run training:
-#   docker-compose run training python scripts/train_inverse.py --config configs/pinn_inverse.yaml --patient 3
+#   docker-compose run training python scripts/train_inverse.py \
+#     --config configs/pinn_inverse.yaml --patient 5
 #
-# Access UIs:
-#   MLflow: http://localhost:5000
-#   Airflow: http://localhost:8080 (admin/admin)
+# Run with S3 upload:
+#   docker-compose run -e T1D_S3_BUCKET=my-bucket training python scripts/train_inverse.py \
+#     --config configs/pinn_inverse.yaml --patient 5 --upload-s3
 #
-# Remove everything (including volumes):
-#   docker-compose down -v
+# Clean up:
+#   docker-compose down
 # =============================================================================

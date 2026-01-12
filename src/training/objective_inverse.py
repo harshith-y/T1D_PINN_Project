@@ -49,6 +49,7 @@ def run_inverse_training(
     if model_type in ["pinn", "modified_mlp"]:
         # DeepXDE requires TF 1.x compatibility mode
         import tensorflow as tf
+
         if tf.executing_eagerly():
             # Already in eager mode - this will cause issues for DeepXDE
             # Return a high error to penalize this configuration
@@ -81,12 +82,15 @@ def run_inverse_training(
         # Build model
         if model_type == "birnn":
             from src.models.birnn import BIRNN
+
             model = BIRNN(config)
         elif model_type == "pinn":
             from src.models.pinn_feedforward import FeedforwardPINN
+
             model = FeedforwardPINN(config)
         elif model_type == "modified_mlp":
             from src.models.modified_mlp import ModifiedMLPPINN
+
             model = ModifiedMLPPINN(config)
         else:
             raise ValueError(f"Unknown model type: {model_type}")
@@ -212,8 +216,14 @@ class InverseObjective:
 
         if self.verbose:
             print("Sampled hyperparameters:")
-            for key in ["stage1_epochs", "stage1_lr", "stage2_epochs", "stage2_lr",
-                        "stage3_epochs", "stage3_lr"]:
+            for key in [
+                "stage1_epochs",
+                "stage1_lr",
+                "stage2_epochs",
+                "stage2_lr",
+                "stage3_epochs",
+                "stage3_lr",
+            ]:
                 if key in params:
                     print(f"  {key}: {params[key]}")
 

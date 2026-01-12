@@ -23,30 +23,30 @@ training:
   
   stages:
     - name: stage1_params_only
-      epochs: 500
+      epochs: 5000
       learning_rate: 1.0e-3
       # Use full optimized loss weights (not zeros!)
-      loss_weights: [0.89, 5.84, 8.53, 9.91]
+      loss_weights: [1, 0, 0, 0]
       train_inverse_params: true
       train_nn_weights: false
       optimizer: adam
       display_every: 500
     
     - name: stage2_nn_only
-      epochs: 800
+      epochs: 3000
       learning_rate: 5.0e-4
       # Same optimized weights
-      loss_weights: [0.89, 5.84, 8.53, 9.91]
+      loss_weights: [5.84, 8.53, 9.91, 0.89]
       train_inverse_params: false
       train_nn_weights: true
       optimizer: adam
       display_every: 500
     
     - name: stage3_joint
-      epochs: 200
+      epochs: 2000
       learning_rate: 2.0e-4
       # Same optimized weights
-      loss_weights: [0.89, 5.84, 8.53, 9.91]
+      loss_weights: [5.84, 8.53, 9.91, 0.89]
       train_inverse_params: true
       train_nn_weights: true
       optimizer: adam

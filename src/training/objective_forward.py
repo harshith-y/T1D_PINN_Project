@@ -46,6 +46,7 @@ def run_forward_training(
     # Import here to allow TF mode setup before import
     if model_type in ["pinn", "modified_mlp"]:
         import tensorflow as tf
+
         if tf.executing_eagerly():
             if verbose:
                 print(f"  Warning: TF eager mode active, cannot run {model_type}")
@@ -69,12 +70,15 @@ def run_forward_training(
         # Build model
         if model_type == "birnn":
             from src.models.birnn import BIRNN
+
             model = BIRNN(config)
         elif model_type == "pinn":
             from src.models.pinn_feedforward import FeedforwardPINN
+
             model = FeedforwardPINN(config)
         elif model_type == "modified_mlp":
             from src.models.modified_mlp import ModifiedMLPPINN
+
             model = ModifiedMLPPINN(config)
         else:
             raise ValueError(f"Unknown model type: {model_type}")
@@ -83,7 +87,9 @@ def run_forward_training(
         model.compile()
 
         if verbose:
-            print(f"  Training {model_type.upper()} for {params.get('epochs', 10000)} epochs...")
+            print(
+                f"  Training {model_type.upper()} for {params.get('epochs', 10000)} epochs..."
+            )
 
         # Train model
         model.train(display_every=max(1000, params.get("epochs", 10000) // 10))

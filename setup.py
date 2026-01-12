@@ -19,6 +19,7 @@ setup(
         "optuna>=3.5,<4",
         "tqdm>=4.66,<5",
         "mlflow>=2.10,<3",
+        "boto3>=1.34,<2",
     ],
     extras_require={
         "dev": [

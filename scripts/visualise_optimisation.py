@@ -35,16 +35,18 @@ import seaborn as sns
 
 # Style settings for thesis figures
 plt.style.use("seaborn-v0_8-whitegrid")
-plt.rcParams.update({
-    "figure.figsize": (10, 6),
-    "figure.dpi": 150,
-    "font.size": 12,
-    "axes.labelsize": 14,
-    "axes.titlesize": 14,
-    "legend.fontsize": 11,
-    "xtick.labelsize": 11,
-    "ytick.labelsize": 11,
-})
+plt.rcParams.update(
+    {
+        "figure.figsize": (10, 6),
+        "figure.dpi": 150,
+        "font.size": 12,
+        "axes.labelsize": 14,
+        "axes.titlesize": 14,
+        "legend.fontsize": 11,
+        "xtick.labelsize": 11,
+        "ytick.labelsize": 11,
+    }
+)
 
 
 def load_study(db_path: str, study_name: str = None) -> optuna.Study:
@@ -183,7 +185,7 @@ def plot_model_comparison(study: optuna.Study, output_dir: Path, mode: str):
     ax.set_title(f"Model Comparison - {mode.capitalize()} Mode")
 
     # Better labels
-    ax.set_xticklabels(["BI-RNN", "PINN", "Mod-MLP"][:len(available_models)])
+    ax.set_xticklabels(["BI-RNN", "PINN", "Mod-MLP"][: len(available_models)])
 
     # Save
     output_path = output_dir / f"model_comparison_{mode}.png"
@@ -326,7 +328,11 @@ def plot_epoch_analysis(study: optuna.Study, output_dir: Path, mode: str):
 
     # Calculate total epochs
     if mode == "inverse":
-        epoch_cols = ["params_stage1_epochs", "params_stage2_epochs", "params_stage3_epochs"]
+        epoch_cols = [
+            "params_stage1_epochs",
+            "params_stage2_epochs",
+            "params_stage3_epochs",
+        ]
         available = [c for c in epoch_cols if c in df.columns]
         if available:
             df["total_epochs"] = df[available].sum(axis=1)
@@ -375,13 +381,19 @@ def generate_summary_table(study: optuna.Study, output_dir: Path, mode: str):
 
     # Summary by model type
     if "params_model_type" in df.columns:
-        summary = df.groupby("params_model_type")["value"].agg([
-            "count",
-            "mean",
-            "std",
-            "min",
-            ("best_trial", lambda x: df.loc[x.idxmin(), "number"]),
-        ]).round(4)
+        summary = (
+            df.groupby("params_model_type")["value"]
+            .agg(
+                [
+                    "count",
+                    "mean",
+                    "std",
+                    "min",
+                    ("best_trial", lambda x: df.loc[x.idxmin(), "number"]),
+                ]
+            )
+            .round(4)
+        )
 
         summary.columns = ["Trials", "Mean", "Std", "Best", "Best Trial"]
         summary.index = summary.index.map(lambda x: x.upper())
@@ -451,7 +463,9 @@ def main():
     study = load_study(args.study_db, args.study_name)
     print(f"  Study: {study.study_name}")
     print(f"  Trials: {len(study.trials)}")
-    print(f"  Complete: {len([t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE])}")
+    print(
+        f"  Complete: {len([t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE])}"
+    )
 
     # Generate visualisations
     print("\nGenerating visualisations...")

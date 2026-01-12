@@ -125,12 +125,31 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
-### Docker (Alternative)
+### Docker (Optional)
+
+Docker is available for reproducible builds but not required for development:
 
 ```bash
 docker-compose build
-docker-compose up
+docker-compose run training python scripts/train_inverse.py --config configs/pinn_inverse.yaml --patient 5
 ```
+
+### Cloud Training (AWS)
+
+For GPU-accelerated training, the project supports AWS EC2 with S3 results storage:
+
+```bash
+# On EC2 GPU instance (g4dn.xlarge with Tesla T4)
+python scripts/train_inverse.py --config configs/pinn_inverse.yaml --patient 5 --upload-s3
+
+# Results automatically uploaded to S3 bucket
+# View via AWS Console or: aws s3 ls s3://your-bucket/
+```
+
+**Infrastructure** (managed via Terraform in `terraform/`):
+- EC2 g4dn.xlarge with NVIDIA Tesla T4 GPU
+- S3 bucket for results storage
+- IAM roles for secure access
 
 ## Usage
 
@@ -194,14 +213,28 @@ T1D_PINN_Project/
 ├── scripts/                      # CLI entry points
 ├── configs/                      # YAML configurations
 ├── tests/                        # Unit & integration tests
+├── terraform/                    # AWS infrastructure (EC2, S3)
 ├── data/
 │   ├── synthetic/                # Simulated patient data
 │   └── processed/                # Real patient data (not included)
-├── Dockerfile
-├── docker-compose.yml
+├── Dockerfile                    # Container definition
+├── docker-compose.yml            # Simplified training service
 ├── requirements.txt
 └── README.md
 ```
+
+## Infrastructure
+
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│  Local Machine  │────▶│   EC2 (GPU)     │────▶│      S3         │
+│  (development)  │ SSH │   Training      │     │   Results       │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+```
+
+- **Local**: Development, testing, configuration
+- **EC2**: GPU training (g4dn.xlarge, Tesla T4)
+- **S3**: Results storage and sharing
 
 ## Data
 

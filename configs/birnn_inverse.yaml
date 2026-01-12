@@ -19,17 +19,17 @@ architecture:
 training:
   stages:
     - name: stage1_params_only
-      epochs: 50
+      epochs: 500
       learning_rate: 1.0e-2
       # Loss weights: [lambda_g, lambda_B, lambda_ic]
-      loss_weights: [1.0, 1.0, 0.0]  # Only glucose loss
+      loss_weights: [1.0, 0.0, 0.0]  # Only glucose loss
       train_inverse_params: true
       train_nn_weights: false
       optimizer: adam
       display_every: 50
     
     - name: stage2_nn_only
-      epochs: 100
+      epochs: 800
       learning_rate: 5.0e-3
       # Balanced losses (from Bayesian optimization)
       loss_weights: [8.0, 4.82, 0.53]
@@ -39,7 +39,7 @@ training:
       display_every: 50
     
     - name: stage3_joint
-      epochs: 50
+      epochs: 600
       learning_rate: 2.0e-3
       loss_weights: [8.0, 4.82, 0.53]
       train_inverse_params: true

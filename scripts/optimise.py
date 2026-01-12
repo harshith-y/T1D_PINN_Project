@@ -121,12 +121,15 @@ def run_trial(
         # Build model (import inside function for TF mode control)
         if model_type == "birnn":
             from src.models.birnn import BIRNN
+
             model = BIRNN(config)
         elif model_type == "pinn":
             from src.models.pinn_feedforward import FeedforwardPINN
+
             model = FeedforwardPINN(config)
         elif model_type == "modified_mlp":
             from src.models.modified_mlp import ModifiedMLPPINN
+
             model = ModifiedMLPPINN(config)
         else:
             raise ValueError(f"Unknown model type: {model_type}")
@@ -180,6 +183,7 @@ def run_trial(
         if verbose:
             print(f"  Error: {e}")
             import traceback
+
             traceback.print_exc()
         return 100.0 if mode == "inverse" else 1.0, {"error": str(e)}
 
@@ -235,11 +239,19 @@ class UnifiedObjective:
         # Show key params
         if self.verbose:
             if self.mode == "inverse":
-                print(f"  stage1: {params.get('stage1_epochs')} epochs, lr={params.get('stage1_lr'):.2e}")
-                print(f"  stage2: {params.get('stage2_epochs')} epochs, lr={params.get('stage2_lr'):.2e}")
-                print(f"  stage3: {params.get('stage3_epochs')} epochs, lr={params.get('stage3_lr'):.2e}")
+                print(
+                    f"  stage1: {params.get('stage1_epochs')} epochs, lr={params.get('stage1_lr'):.2e}"
+                )
+                print(
+                    f"  stage2: {params.get('stage2_epochs')} epochs, lr={params.get('stage2_lr'):.2e}"
+                )
+                print(
+                    f"  stage3: {params.get('stage3_epochs')} epochs, lr={params.get('stage3_lr'):.2e}"
+                )
             else:
-                print(f"  epochs: {params.get('epochs')}, lr={params.get('learning_rate'):.2e}")
+                print(
+                    f"  epochs: {params.get('epochs')}, lr={params.get('learning_rate'):.2e}"
+                )
 
         # Run trial
         value, results = run_trial(
@@ -307,10 +319,12 @@ def export_results(study: optuna.Study, output_dir: Path):
             continue
         # Check both params and user_attrs for model_type
         model_type = trial.params.get(
-            "model_type",
-            trial.user_attrs.get("model_type_fixed", "unknown")
+            "model_type", trial.user_attrs.get("model_type_fixed", "unknown")
         )
-        if model_type not in best_by_model or trial.value < best_by_model[model_type]["value"]:
+        if (
+            model_type not in best_by_model
+            or trial.value < best_by_model[model_type]["value"]
+        ):
             best_by_model[model_type] = {
                 "trial": trial.number,
                 "value": trial.value,
@@ -323,7 +337,9 @@ def export_results(study: optuna.Study, output_dir: Path):
     print(f"  JSON: {json_path}")
 
 
-def upload_to_s3(local_dir: str, bucket: str, s3_prefix: str, region: str = "eu-west-2") -> bool:
+def upload_to_s3(
+    local_dir: str, bucket: str, s3_prefix: str, region: str = "eu-west-2"
+) -> bool:
     """Upload results to S3."""
     try:
         import boto3
@@ -365,7 +381,7 @@ Examples:
 
   # Quick test
   python scripts/optimise.py --mode inverse --n-trials 3 --search-patient 5 --no-upload
-        """
+        """,
     )
 
     # Required arguments
@@ -523,8 +539,7 @@ Examples:
 
     if len(study.trials) > 0:
         best_model = study.best_trial.params.get(
-            "model_type",
-            study.best_trial.user_attrs.get("model_type_fixed", "unknown")
+            "model_type", study.best_trial.user_attrs.get("model_type_fixed", "unknown")
         )
         print(f"\nBest trial:")
         print(f"  Trial: {study.best_trial.number}")

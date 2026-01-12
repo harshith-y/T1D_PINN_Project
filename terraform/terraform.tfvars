@@ -7,11 +7,10 @@ aws_region   = "eu-west-2"  # London
 environment  = "dev"
 owner_email  = "your-email@imperial.ac.uk"  # CHANGE THIS
 
-# Instance configuration - CPU for testing (upgrade to GPU later)
-# t3.micro: 2 vCPU, 1GB RAM - ~$0.01/hour
-# After GPU quota approved, change to: g4dn.xlarge
-instance_type     = "t3.micro"
-root_volume_size  = 30              # GB (enough for testing)
+# Instance configuration - GPU for training
+# g4dn.xlarge: 4 vCPU, 16GB RAM, 1x T4 GPU (16GB) - ~$0.526/hour
+instance_type     = "g4dn.xlarge"
+root_volume_size  = 100             # GB (for models and data)
 use_elastic_ip    = false           # IP changes on restart, but saves money
 
 # SSH key (already created)

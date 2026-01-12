@@ -31,12 +31,51 @@ tf.compat.v1.disable_eager_execution()
 import argparse
 from datetime import datetime
 
+import boto3
+from botocore.exceptions import NoCredentialsError, ClientError
+
 from src.datasets.loader import load_real_patient_csv, load_synthetic_window
 from src.physics.magdelaine import make_params_from_preset
 from src.training.checkpoint import CheckpointManager
 from src.training.config import Config
 from src.training.inverse_trainer import InverseTrainer
 from src.training.predictions import PredictionManager
+
+
+def upload_to_s3(local_dir: str, bucket: str, s3_prefix: str, region: str = "eu-west-2") -> bool:
+    """
+    Upload results directory to S3.
+
+    Args:
+        local_dir: Local directory to upload
+        bucket: S3 bucket name
+        s3_prefix: Prefix (folder path) in S3
+        region: AWS region
+
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        s3_client = boto3.client("s3", region_name=region)
+        local_path = Path(local_dir)
+
+        uploaded_count = 0
+        for file_path in local_path.rglob("*"):
+            if file_path.is_file():
+                relative_path = file_path.relative_to(local_path)
+                s3_key = f"{s3_prefix}/{relative_path}"
+                s3_client.upload_file(str(file_path), bucket, s3_key)
+                uploaded_count += 1
+
+        print(f"✅ Uploaded {uploaded_count} files to s3://{bucket}/{s3_prefix}/")
+        return True
+
+    except NoCredentialsError:
+        print("❌ S3 upload failed: AWS credentials not found")
+        return False
+    except ClientError as e:
+        print(f"❌ S3 upload failed: {e}")
+        return False
 
 
 def load_model(model_name: str, config):
@@ -89,6 +128,23 @@ def main():
         "Examples: --inverse-params ksi  OR  --inverse-params ksi kl ku_Vi",
     )
     parser.add_argument("--save-dir", type=str, default=None)
+    parser.add_argument(
+        "--upload-s3",
+        action="store_true",
+        help="Upload results to S3 after training",
+    )
+    parser.add_argument(
+        "--s3-bucket",
+        type=str,
+        default=os.getenv("T1D_S3_BUCKET", "t1d-pinn-results-900630261719"),
+        help="S3 bucket for results (default: from T1D_S3_BUCKET env or t1d-pinn-results-900630261719)",
+    )
+    parser.add_argument(
+        "--s3-region",
+        type=str,
+        default=os.getenv("AWS_REGION", "eu-west-2"),
+        help="AWS region (default: eu-west-2)",
+    )
 
     args = parser.parse_args()
 
@@ -382,6 +438,21 @@ def main():
 
     print(f"\n📁 Output:")
     print(f"   {args.save_dir}")
+
+    # ========================================================================
+    # S3 Upload (if enabled)
+    # ========================================================================
+    if args.upload_s3:
+        print("\n[S3] Uploading results to S3...")
+        # Create S3 prefix from save_dir (e.g., results/pinn_inverse/Pat5_ksi_... -> pinn_inverse/Pat5_ksi_...)
+        s3_prefix = str(Path(args.save_dir)).replace("results/", "")
+        upload_to_s3(
+            local_dir=args.save_dir,
+            bucket=args.s3_bucket,
+            s3_prefix=s3_prefix,
+            region=args.s3_region,
+        )
+        print(f"   S3 URL: s3://{args.s3_bucket}/{s3_prefix}/")
 
     print("\n" + "=" * 80)
 

@@ -494,7 +494,7 @@ class BIRNN:
 
         # Compute gradients
         variables = self.model.trainable_variables
-        if self.log_ksi is not None:
+        if self.inverse_params:
             variables = variables + self.inverse_params
 
         grads = tape.gradient(loss, variables)
