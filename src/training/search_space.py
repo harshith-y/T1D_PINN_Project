@@ -56,27 +56,31 @@ class SearchSpace:
         return params
 
     def _sample_architecture(self, trial: optuna.Trial) -> Dict[str, Any]:
-        """Sample architecture-specific parameters."""
+        """Sample architecture-specific parameters.
+
+        Note: Each model uses prefixed parameter names to avoid Optuna's
+        CategoricalDistribution conflict when models have different choice sets.
+        """
         if self.model_type == "birnn":
             return {
                 "gru_units": trial.suggest_categorical(
-                    "gru_units", [32, 64, 96, 128]
+                    "birnn_gru_units", [32, 64, 96, 128]
                 ),
                 "n_dense_layers": trial.suggest_categorical(
-                    "n_dense_layers", [1, 2, 3]
+                    "birnn_n_dense_layers", [1, 2, 3]
                 ),
             }
         elif self.model_type == "pinn":
             return {
-                "n_layers": trial.suggest_categorical("n_layers", [3, 4, 5, 6]),
-                "n_neurons": trial.suggest_categorical("n_neurons", [20, 30, 40, 50]),
-                "use_fourier": trial.suggest_categorical("use_fourier", [True, False]),
+                "n_layers": trial.suggest_categorical("pinn_n_layers", [3, 4, 5, 6]),
+                "n_neurons": trial.suggest_categorical("pinn_n_neurons", [20, 30, 40, 50]),
+                "use_fourier": trial.suggest_categorical("pinn_use_fourier", [True, False]),
             }
         elif self.model_type == "modified_mlp":
             return {
-                "n_layers": trial.suggest_categorical("n_layers", [4, 5, 6, 7]),
-                "n_neurons": trial.suggest_categorical("n_neurons", [20, 30, 40]),
-                "n_encoders": trial.suggest_categorical("n_encoders", [2, 3, 4]),
+                "n_layers": trial.suggest_categorical("mlp_n_layers", [4, 5, 6, 7]),
+                "n_neurons": trial.suggest_categorical("mlp_n_neurons", [20, 30, 40]),
+                "n_encoders": trial.suggest_categorical("mlp_n_encoders", [2, 3, 4]),
             }
         else:
             raise ValueError(f"Unknown model type: {self.model_type}")
@@ -96,27 +100,40 @@ class SearchSpace:
             ),
         }
 
-        # Model-specific loss weights
+        # Model-specific loss weights (prefixed to avoid conflicts)
         if self.model_type == "birnn":
             params.update({
-                "lambda_g": trial.suggest_float("lambda_g", 1.0, 15.0),
-                "lambda_B": trial.suggest_float("lambda_B", 1.0, 12.0),
-                "lambda_ic": trial.suggest_float("lambda_ic", 0.1, 3.0),
+                "lambda_g": trial.suggest_float("birnn_lambda_g", 1.0, 15.0),
+                "lambda_B": trial.suggest_float("birnn_lambda_B", 1.0, 12.0),
+                "lambda_ic": trial.suggest_float("birnn_lambda_ic", 0.1, 3.0),
             })
-        else:  # PINN / Modified-MLP
+        elif self.model_type == "pinn":
             params.update({
-                "w_glucose_obs": trial.suggest_float("w_glucose_obs", 1.0, 10.0),
-                "w_ode_g": trial.suggest_float("w_ode_g", 1.0, 12.0),
-                "w_ode_i": trial.suggest_float("w_ode_i", 1.0, 12.0),
-                "w_ode_d": trial.suggest_float("w_ode_d", 0.1, 3.0),
+                "w_glucose_obs": trial.suggest_float("pinn_w_glucose_obs", 1.0, 10.0),
+                "w_ode_g": trial.suggest_float("pinn_w_ode_g", 1.0, 12.0),
+                "w_ode_i": trial.suggest_float("pinn_w_ode_i", 1.0, 12.0),
+                "w_ode_d": trial.suggest_float("pinn_w_ode_d", 0.1, 3.0),
+            })
+        else:  # Modified-MLP
+            params.update({
+                "w_glucose_obs": trial.suggest_float("mlp_w_glucose_obs", 1.0, 10.0),
+                "w_ode_g": trial.suggest_float("mlp_w_ode_g", 1.0, 12.0),
+                "w_ode_i": trial.suggest_float("mlp_w_ode_i", 1.0, 12.0),
+                "w_ode_d": trial.suggest_float("mlp_w_ode_d", 0.1, 3.0),
             })
 
-        # L-BFGS refinement (for DeepXDE models)
-        if self.model_type in ["pinn", "modified_mlp"]:
-            params["use_lbfgs"] = trial.suggest_categorical("use_lbfgs", [True, False])
+        # L-BFGS refinement (for DeepXDE models, prefixed by model)
+        if self.model_type == "pinn":
+            params["use_lbfgs"] = trial.suggest_categorical("pinn_use_lbfgs", [True, False])
             if params["use_lbfgs"]:
                 params["lbfgs_epochs"] = trial.suggest_categorical(
-                    "lbfgs_epochs", [500, 1000, 2000]
+                    "pinn_lbfgs_epochs", [500, 1000, 2000]
+                )
+        elif self.model_type == "modified_mlp":
+            params["use_lbfgs"] = trial.suggest_categorical("mlp_use_lbfgs", [True, False])
+            if params["use_lbfgs"]:
+                params["lbfgs_epochs"] = trial.suggest_categorical(
+                    "mlp_lbfgs_epochs", [500, 1000, 2000]
                 )
 
         return params
@@ -159,27 +176,40 @@ class SearchSpace:
             "stage3_lr", 5e-5, 5e-4, log=True
         )
 
-        # Loss weights (vary by model type)
+        # Loss weights (vary by model type, prefixed to avoid conflicts)
         if self.model_type == "birnn":
             params.update({
-                "lambda_g": trial.suggest_float("lambda_g", 1.0, 15.0),
-                "lambda_B": trial.suggest_float("lambda_B", 1.0, 12.0),
-                "lambda_ic": trial.suggest_float("lambda_ic", 0.1, 3.0),
+                "lambda_g": trial.suggest_float("birnn_inv_lambda_g", 1.0, 15.0),
+                "lambda_B": trial.suggest_float("birnn_inv_lambda_B", 1.0, 12.0),
+                "lambda_ic": trial.suggest_float("birnn_inv_lambda_ic", 0.1, 3.0),
             })
-        else:  # PINN / Modified-MLP
+        elif self.model_type == "pinn":
             params.update({
-                "w_glucose_obs": trial.suggest_float("w_glucose_obs", 1.0, 10.0),
-                "w_ode_g": trial.suggest_float("w_ode_g", 1.0, 12.0),
-                "w_ode_i": trial.suggest_float("w_ode_i", 1.0, 12.0),
-                "w_ode_d": trial.suggest_float("w_ode_d", 0.1, 3.0),
+                "w_glucose_obs": trial.suggest_float("pinn_inv_w_glucose_obs", 1.0, 10.0),
+                "w_ode_g": trial.suggest_float("pinn_inv_w_ode_g", 1.0, 12.0),
+                "w_ode_i": trial.suggest_float("pinn_inv_w_ode_i", 1.0, 12.0),
+                "w_ode_d": trial.suggest_float("pinn_inv_w_ode_d", 0.1, 3.0),
+            })
+        else:  # Modified-MLP
+            params.update({
+                "w_glucose_obs": trial.suggest_float("mlp_inv_w_glucose_obs", 1.0, 10.0),
+                "w_ode_g": trial.suggest_float("mlp_inv_w_ode_g", 1.0, 12.0),
+                "w_ode_i": trial.suggest_float("mlp_inv_w_ode_i", 1.0, 12.0),
+                "w_ode_d": trial.suggest_float("mlp_inv_w_ode_d", 0.1, 3.0),
             })
 
-        # L-BFGS refinement (for DeepXDE models)
-        if self.model_type in ["pinn", "modified_mlp"]:
-            params["use_lbfgs"] = trial.suggest_categorical("use_lbfgs", [True, False])
+        # L-BFGS refinement (for DeepXDE models, prefixed by model)
+        if self.model_type == "pinn":
+            params["use_lbfgs"] = trial.suggest_categorical("pinn_inv_use_lbfgs", [True, False])
             if params["use_lbfgs"]:
                 params["lbfgs_epochs"] = trial.suggest_categorical(
-                    "lbfgs_epochs", [500, 1000, 2000]
+                    "pinn_inv_lbfgs_epochs", [500, 1000, 2000]
+                )
+        elif self.model_type == "modified_mlp":
+            params["use_lbfgs"] = trial.suggest_categorical("mlp_inv_use_lbfgs", [True, False])
+            if params["use_lbfgs"]:
+                params["lbfgs_epochs"] = trial.suggest_categorical(
+                    "mlp_inv_lbfgs_epochs", [500, 1000, 2000]
                 )
 
         return params
