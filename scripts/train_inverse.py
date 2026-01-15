@@ -42,7 +42,9 @@ from src.training.inverse_trainer import InverseTrainer
 from src.training.predictions import PredictionManager
 
 
-def upload_to_s3(local_dir: str, bucket: str, s3_prefix: str, region: str = "eu-west-2") -> bool:
+def upload_to_s3(
+    local_dir: str, bucket: str, s3_prefix: str, region: str = "eu-west-2"
+) -> bool:
     """
     Upload results directory to S3.
 
