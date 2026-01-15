@@ -584,7 +584,8 @@ def run_single_experiment(
     result_file = output_dir / f"{approach_name}_pat{patient}_seed{seed}.json"
     with open(result_file, "w") as f:
         result_dict = asdict(result)
-        json.dump(result_dict, f, indent=2)
+        # Convert numpy types to Python types for JSON serialization
+        json.dump(result_dict, f, indent=2, default=lambda x: float(x) if hasattr(x, 'item') else x)
 
     # Save trajectory as CSV for easy plotting
     trajectory_file = (
@@ -712,7 +713,7 @@ def run_study(
     print(f"Results saved to: {output_dir}")
     print(f"{'='*70}")
 
-    return df
+    return df, output_dir
 
 
 def compute_summary_statistics(df: pd.DataFrame, output_dir: Path) -> pd.DataFrame:
@@ -927,6 +928,54 @@ def generate_comprehensive_report(output_dir: Path) -> None:
     print(f"\nComprehensive report saved to: {report_path}")
 
 
+def upload_results_to_s3(output_dir: Path, bucket: str = "t1d-pinn-results") -> bool:
+    """Upload results to S3 before shutdown."""
+    import subprocess
+
+    print("\n" + "=" * 70)
+    print("UPLOADING RESULTS TO S3")
+    print("=" * 70)
+
+    try:
+        # Sync results directory to S3
+        s3_path = f"s3://{bucket}/training_study/{output_dir.name}/"
+        cmd = ["aws", "s3", "sync", str(output_dir), s3_path]
+        print(f"Running: {' '.join(cmd)}")
+
+        result = subprocess.run(cmd, capture_output=True, text=True)
+
+        if result.returncode == 0:
+            print(f"Successfully uploaded to {s3_path}")
+            return True
+        else:
+            print(f"S3 upload failed: {result.stderr}")
+            return False
+    except Exception as e:
+        print(f"Warning: Could not upload to S3: {e}")
+        return False
+
+
+def shutdown_instance():
+    """Shutdown the EC2 instance after experiment completion."""
+    import subprocess
+
+    print("\n" + "=" * 70)
+    print("SHUTTING DOWN EC2 INSTANCE")
+    print("=" * 70)
+
+    try:
+        # Use AWS CLI to stop the instance
+        result = subprocess.run(
+            ["sudo", "shutdown", "-h", "now"],
+            capture_output=True,
+            text=True,
+        )
+        print("Shutdown command issued successfully")
+    except Exception as e:
+        print(f"Warning: Could not shutdown instance: {e}")
+        print("Please manually stop the instance to avoid charges!")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Run training approach comparison study"
@@ -941,6 +990,11 @@ def main():
     )
     parser.add_argument(
         "--test-only", action="store_true", help="Run only on test patients"
+    )
+    parser.add_argument(
+        "--auto-shutdown",
+        action="store_true",
+        help="Shutdown EC2 instance after completion",
     )
 
     args = parser.parse_args()
@@ -960,11 +1014,18 @@ def main():
         patients = TEST_PATIENTS
 
     # Run study
-    run_study(
+    df, output_dir = run_study(
         approaches=approaches,
         patients=patients,
         pilot=args.pilot,
     )
+
+    # Auto-shutdown if requested
+    if args.auto_shutdown:
+        # Upload results to S3 first
+        upload_results_to_s3(output_dir)
+        # Then shutdown
+        shutdown_instance()
 
 
 if __name__ == "__main__":
