@@ -251,6 +251,11 @@ class BIRNN:
             hidden_units=hidden_units, num_layers=num_layers, hard_ic=hard_ic
         )
 
+        # CRITICAL: Build the model by calling it once
+        # This initializes all layers so trainable_variables is populated
+        # Required for InverseTrainer when train_nn_weights=True in early stages
+        _ = self.model(self.X_train, training=False)
+
         print(f"✅ BI-RNN built successfully")
         print(f"   Architecture: {num_layers} GRU layers, {hidden_units} hidden units")
         print(f"   Patient: {patient_num}")
