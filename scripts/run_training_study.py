@@ -585,7 +585,12 @@ def run_single_experiment(
     with open(result_file, "w") as f:
         result_dict = asdict(result)
         # Convert numpy types to Python types for JSON serialization
-        json.dump(result_dict, f, indent=2, default=lambda x: float(x) if hasattr(x, 'item') else x)
+        json.dump(
+            result_dict,
+            f,
+            indent=2,
+            default=lambda x: float(x) if hasattr(x, "item") else x,
+        )
 
     # Save trajectory as CSV for easy plotting
     trajectory_file = (
