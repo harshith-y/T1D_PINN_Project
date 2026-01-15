@@ -32,7 +32,7 @@ import argparse
 from datetime import datetime
 
 import boto3
-from botocore.exceptions import NoCredentialsError, ClientError
+from botocore.exceptions import ClientError, NoCredentialsError
 
 from src.datasets.loader import load_real_patient_csv, load_synthetic_window
 from src.physics.magdelaine import make_params_from_preset
