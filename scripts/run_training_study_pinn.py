@@ -42,6 +42,13 @@ import pandas as pd
 project_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(project_root))
 
+import deepxde as dde
+
+# CRITICAL: Disable XLA in DeepXDE (must be done before any model building)
+dde.config.set_default_float("float32")
+if hasattr(dde.config, "set_xla_jit"):
+    dde.config.set_xla_jit(False)
+
 from src.datasets.loader import load_synthetic_window
 from src.models.pinn_feedforward import FeedforwardPINN
 from src.physics.magdelaine import make_params_from_preset
