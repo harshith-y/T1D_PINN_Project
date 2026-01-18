@@ -26,6 +26,7 @@ from typing import Any, Dict, List, Optional
 # CRITICAL: Disable eager execution BEFORE importing TensorFlow
 os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
+os.environ["TF_XLA_FLAGS"] = "--tf_xla_auto_jit=0"  # Disable XLA to avoid CUDA version issues
 
 import tensorflow as tf
 
@@ -510,7 +511,9 @@ def run_single_experiment(
     # Since we're in graph mode, we'll get this from the inverse_params_obj
     try:
         # Try to get the initialized value before training
-        ksi_init = 225.0  # Default placeholder - will be updated after first training epoch
+        ksi_init = (
+            225.0  # Default placeholder - will be updated after first training epoch
+        )
     except Exception:
         ksi_init = 225.0
 
@@ -643,8 +646,14 @@ def run_single_experiment(
             {
                 "epoch": epoch_trajectory,
                 "ksi": ksi_trajectory,
-                "loss": loss_trajectory if loss_trajectory else [0] * len(epoch_trajectory),
-                "stage": stage_trajectory if stage_trajectory else ["unknown"] * len(epoch_trajectory),
+                "loss": (
+                    loss_trajectory if loss_trajectory else [0] * len(epoch_trajectory)
+                ),
+                "stage": (
+                    stage_trajectory
+                    if stage_trajectory
+                    else ["unknown"] * len(epoch_trajectory)
+                ),
             }
         )
         trajectory_df["ksi_true"] = true_ksi
@@ -738,6 +747,7 @@ def run_study(
                 except Exception as e:
                     print(f"ERROR: {e}")
                     import traceback
+
                     traceback.print_exc()
                     # Record failed experiment
                     results.append(
@@ -849,7 +859,9 @@ def generate_comprehensive_report(output_dir: Path) -> None:
         study_config = json.load(f)
 
     report_lines = []
-    report_lines.append("# PINN Training Approach Comparison Study - Comprehensive Report\n")
+    report_lines.append(
+        "# PINN Training Approach Comparison Study - Comprehensive Report\n"
+    )
     report_lines.append(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
     report_lines.append(f"Results directory: `{output_dir}`\n\n")
 
@@ -919,7 +931,9 @@ def generate_comprehensive_report(output_dir: Path) -> None:
     print(f"\nComprehensive report saved to: {report_path}")
 
 
-def upload_results_to_s3(output_dir: Path, bucket: str = "t1d-pinn-results-900630261719") -> bool:
+def upload_results_to_s3(
+    output_dir: Path, bucket: str = "t1d-pinn-results-900630261719"
+) -> bool:
     """Upload results to S3 before shutdown."""
     import subprocess
 
