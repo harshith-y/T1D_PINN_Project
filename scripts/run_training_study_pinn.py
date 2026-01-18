@@ -26,7 +26,9 @@ from typing import Any, Dict, List, Optional
 # CRITICAL: Disable eager execution BEFORE importing TensorFlow
 os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
-os.environ["TF_XLA_FLAGS"] = "--tf_xla_auto_jit=0"  # Disable XLA to avoid CUDA version issues
+os.environ["TF_XLA_FLAGS"] = (
+    "--tf_xla_auto_jit=0"  # Disable XLA to avoid CUDA version issues
+)
 
 import tensorflow as tf
 
