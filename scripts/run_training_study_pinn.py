@@ -46,8 +46,8 @@ import deepxde as dde
 
 # CRITICAL: Disable XLA in DeepXDE (must be done before any model building)
 dde.config.set_default_float("float32")
-if hasattr(dde.config, "set_xla_jit"):
-    dde.config.set_xla_jit(False)
+# Disable XLA JIT compilation - direct attribute access
+dde.config.xla_jit = False
 
 from src.datasets.loader import load_synthetic_window
 from src.models.pinn_feedforward import FeedforwardPINN
