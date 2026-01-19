@@ -25,6 +25,7 @@ class ModelArchitectureConfig:
     fourier_features: List[int] = field(default_factory=lambda: [0, 1, 2, 3, 4, 5])
     # Modified MLP specific
     n_encoders: int = 2  # U and V pathways
+    use_hard_ic: bool = True  # Use hard initial conditions (Modified-MLP/PINN)
     # BI-RNN specific
     rnn_units: int = 96
     rnn_type: str = "GRU"  # 'GRU' or 'LSTM'
